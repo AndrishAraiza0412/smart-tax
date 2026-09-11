@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "@smarttax/shared": "./shared/index.js",
+    "@smarttax/shared/validation": "./shared/validation.js",
+    "@smarttax/shared/constants/sat-catalogs": "./shared/constants/sat-catalogs.js",
+    "@smarttax/shared/types": "./shared/types/index.js",
+    "zod": "https://esm.sh/zod@3.23.0"
+  }
+}
