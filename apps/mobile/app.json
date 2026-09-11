@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "SmartTax",
+    "slug": "smarttax",
+    "version": "1.0.0",
+    "sdkVersion": "57.0.0",
+    "orientation": "portrait",
+    "scheme": "smarttax",
+    "userInterfaceStyle": "automatic",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.smarttax.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.smarttax.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-local-authentication"
+    ]
+  }
+}

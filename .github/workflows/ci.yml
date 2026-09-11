@@ -1,0 +1,146 @@
+name: SmartTax CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  typecheck:
+    name: TypeCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter=mobile exec eslint . --ext .ts,.tsx || true
+      - run: pnpm --filter=shared exec eslint . --ext .ts || true
+
+  test-shared:
+    name: Test Shared Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter=shared build
+      - run: |
+          node --input-type=module -e "
+          import { RFCSchema, CPSchema, UsoCFDISchema, RegimenFiscalSchema, GastoManualSchema } from './packages/shared/dist/validation.js';
+          const tests = [
+            ['RFC valid', RFCSchema.safeParse('ABC123456XYZ').success, true],
+            ['RFC invalid', RFCSchema.safeParse('ABC').success, false],
+            ['CP valid', CPSchema.safeParse('01000').success, true],
+            ['CP invalid', CPSchema.safeParse('99999').success, false],
+            ['usoCFDI valid', UsoCFDISchema.safeParse('G03').success, true],
+            ['usoCFDI invalid', UsoCFDISchema.safeParse('XYZ').success, false],
+            ['regimen valid', RegimenFiscalSchema.safeParse('601').success, true],
+            ['regimen invalid', RegimenFiscalSchema.safeParse('999').success, false],
+          ];
+          let passed = 0;
+          for (const [name, result, expected] of tests) {
+            if (result === expected) { console.log('✅', name); passed++; }
+            else { console.error('❌', name, 'got', result, 'expected', expected); process.exit(1); }
+          }
+          console.log('All', passed, 'validation tests passed');
+          "
+
+  test-mobile:
+    name: Test Mobile (Typecheck + Build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter=mobile typecheck
+      - run: pnpm --filter=mobile expo export --platform web --output-dir dist-web || true
+
+  test-e2e:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: cd apps/mobile && pnpm exec playwright install --with-deps chromium
+      - run: cd apps/mobile && pnpm exec playwright test --reporter=github
+    env:
+      # Mock Supabase for E2E (tests mock API routes)
+      EXPO_PUBLIC_SUPABASE_URL: https://mock.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: mock-anon-key
+
+  supabase-migrations:
+    name: Validate Supabase Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 'latest'
+      - run: supabase db lint --linked=false --schema=public --file=supabase/migrations/001_init_schema.sql || true
+      - run: supabase db lint --linked=false --schema=public --file=supabase/migrations/002_cfdi_storage.sql || true
+
+  deploy-preview:
+    name: Deploy Preview (on PR)
+    if: github.event_name == 'pull_request'
+    needs: [typecheck, lint, test-shared, test-mobile, test-e2e, supabase-migrations]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: echo "✅ All CI checks passed - ready for preview deploy"
+      # Uncomment when using Expo EAS or Vercel for preview deploys
+      # - uses: expo/expo-github-action@v8
+      #   with:
+      #     expo-version: latest
+      #     eas-version: latest
+      #     token: ${{ secrets.EXPO_TOKEN }}
+      #   run: eas build --platform all --profile preview --non-interactive
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

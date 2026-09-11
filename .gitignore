@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+dist-web/
+build/
+*.tsbuildinfo
+
+# Expo
+.expo/
+.expo-shared/
+
+# Supabase
+.supabase/
+supabase/.temp/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Misc
+*.pem
+.vercel
+.netlify
+# Agent tooling (puede contener secretos en transcripciones)
+.omo/
+.codegraph
