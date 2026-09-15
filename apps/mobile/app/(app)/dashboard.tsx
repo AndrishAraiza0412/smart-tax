@@ -7,6 +7,8 @@ import Svg, { Circle, Polyline } from "react-native-svg";
 import { useGastos } from "../../hooks/useGastos";
 import { ThemeToggle } from "../../components/ui/theme-toggle";
 import type { Gasto } from "../../hooks/useGastos";
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 
 const CIRC = 2 * Math.PI * 48;
 const INITIALS = ["E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
@@ -38,7 +40,14 @@ function shortDate(fecha: string): string {
 export default function Dashboard(): React.JSX.Element {
   const { width } = useWindowDimensions();
   const heroSize = width < 360 ? 30 : 38;
-  const { gastos, loading } = useGastos();
+  const { gastos, loading, refresh } = useGastos();
+
+  // Refresh data when screen gets focus (e.g., after adding a new gasto)
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
   const now = new Date();
   const inMonth = (g: Gasto): boolean => { const [y, m] = g.fecha.split("-").map(Number); return y === now.getFullYear() && m === now.getMonth() + 1; };
   const monthRows = gastos.filter(inMonth);
