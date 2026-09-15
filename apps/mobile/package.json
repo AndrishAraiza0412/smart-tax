@@ -25,6 +25,7 @@
     "expo-local-authentication": "~57.0.3",
     "expo-router": "~57.0.21",
     "expo-status-bar": "~57.0.1",
+    "expo-web-browser": "~57.0.3",
     "metro": "~0.84.4",
     "metro-config": "~0.84.4",
     "nativewind": "^4.1.23",

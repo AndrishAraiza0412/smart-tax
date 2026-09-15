@@ -9,7 +9,6 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
-import { Switch } from "../../components/ui/switch";
 import { insertGasto } from "../../hooks/useGastos";
 import { supabase } from "../../lib/supabase";
 
@@ -58,7 +57,7 @@ export default function GastoManual(): React.JSX.Element {
       }
     }, 800); // debounce
     return () => clearTimeout(timer);
-  }, [descripcion, categoria, control]);
+  }, [descripcion, categoria]);
 
   const submit = async (values: Values) => {
     try {
@@ -82,10 +81,6 @@ export default function GastoManual(): React.JSX.Element {
           {field("fecha", "Fecha (AAAA-MM-DD)")}
           {field("monto", "Monto", true, "0.00")}
           <View className="mt-3"><Label>Categoría</Label><View className="mt-1.5 rounded-md border border-slate-300 bg-white dark:border-white/10 dark:bg-white/5"><Controller control={control} name="categoria" render={({ field: input }) => <Select selectedValue={input.value} onValueChange={input.onChange}>{["Alimentación", "Transporte", "Servicios", "Salud", "Oficina", "Educación", "Entretenimiento", "Otros"].map((item) => <Select.Item key={item} label={item} value={item} />)}</Select>} /></View></View>
-          <View className="mt-5 flex-row items-center justify-between">
-            <Label>Facturable</Label>
-            <Controller control={control} name="facturable" render={({ field: input }) => <Switch value={input.value} onValueChange={input.onChange} />} />
-          </View>
           {aiSuggestion && <View className="mt-3 p-3 rounded-lg bg-skyTint border border-skyBorder"><Text className="font-sans text-xs text-skyText">🤖 IA sugiere: <Text className="font-semibold">{aiSuggestion.facturable ? "Facturable" : "No facturable"}</Text> — {aiSuggestion.razon}</Text>{detecting && <Text className="font-sans text-xs text-skyText mt-1">Analizando…</Text>}</View>}
         </View>
         <Button className="mt-5 rounded-xl" disabled={isSubmitting} onPress={() => void handleSubmit(submit)()}>{isSubmitting ? "Guardando…" : "Guardar gasto"}</Button>
