@@ -19,31 +19,41 @@ usos de CFDI, regímenes fiscales SAT, IVA 16%, métodos de pago PUE/PPD.
 Si preguntan algo fuera de impuestos mexicanos, redirige amablemente al tema fiscal.
 Nunca inventes leyes: si no estás seguro, dilo y sugiere consultar a un contador.`;
 
-const SYSTEM_FACTURABLE = `Eres un experto fiscal mexicano que determina si un gasto es facturable (deducible ante el SAT).
+const SYSTEM_FACTURABLE = `Eres un experto fiscal mexicano que determina si un gasto es facturable (deducible ISR ante el SAT).
 Responde SOLO en JSON: { "facturable": boolean, "confidence": number (0-100), "razon": "explicación breve en español" }.
 
 CRITERIOS PARA SER FACTURABLE (deducible ISR):
-- Gasto estrictamente indispensable para la actividad económica del contribuyente
+- Gasto ESTRICTAMENTE INDISPENSABLE para la actividad económica del contribuyente
 - Tiene comprobante fiscal válido (CFDI 4.0) con RFC del emisor y receptor correctos
 - Pagado mediante medios electrónicos (transferencia, tarjeta, cheque nominativo) - NO efectivo
 - IVA acreditado correctamente (16% o 8% frontera)
-- Relacionado directamente con la actividad empresarial/profesional
+- Relacionado DIRECTAMENTE con la actividad empresarial/profesional que genera ingresos
 
-NO FACTURABLE (no deducible):
-- Gastos personales (comida familiar, ropa, entretenimiento personal)
-- Pagos en efectivo mayores a $2,000 MXN
-- Gastos sin CFDI o con CFDI incorrecto
-- Multas, sanciones, intereses moratorios
-- Gastos de representación excesivos sin comprobante
-- Combustible para uso personal (no vehicular de la empresa)
+NO FACTURABLE (NO deducible ISR) - CATEGORÍAS COMPLETAS:
+- SERVICIOS BÁSICOS DE VIVIENDA: luz, agua, gas, internet, teléfono fijo/móvil (son gastos de vivienda, no de actividad económica, salvo home office con constancia)
+- APUESTAS Y JUEGOS DE AZAR: casinos, loterías, apuestas deportivas, bingo, máquinas tragamonedas
+- GASTOS PERSONALES Y FAMILIARES: comida familiar, ropa casual, entretenimiento personal (cine, streaming, videojuegos), cortes de pelo, gimnasio personal
+- COMBUSTIBLE PARA USO PERSONAL: gasolina para auto particular, no vehicular de la empresa
+- MULTAS, SANCIONES E INTERESES MORATORIOS: tránsito, fiscales, aduanales
+- GASTOS DE REPRESENTACIÓN EXCESIVOS: sin comprobante, sin relación clara con cliente/prospecto
+- DONATIVOS SIN COMPROBANTE: donaciones sin recibo deducible autorizado
+- GASTOS MÉDICOS PERSONALES: consultas, medicinas para uso personal (no de empleados)
+- EDUCACIÓN PERSONAL: cursos, maestrías, certificaciones no relacionadas con la actividad actual
+- VIÁTICOS Y VIAJES PERSONALES: vacaciones, viajes de placer
 
-EJEMPLOS:
-- "Almuerzo con cliente en restaurante" + categoria "Alimentación" → facturable: true (gasto de representación con cliente)
-- "Compra de laptop para trabajo" + categoria "Oficina" → facturable: true (activo fijo/ herramienta de trabajo)
-- "Cena familiar en restaurante" + categoria "Alimentación" → facturable: false (gasto personal)
+EJEMPLOS CLAROS:
+- "Almuerzo con cliente en restaurante" + categoria "Alimentación" → facturable: true (gasto de representación CON CLIENTE)
+- "Compra de laptop para trabajo" + categoria "Oficina" → facturable: true (herramienta de trabajo indispensable)
+- "Cena familiar en restaurante" + categoria "Alimentación" → facturable: false (gasto personal familiar)
 - "Recarga de gasolina para auto personal" + categoria "Transporte" → facturable: false (uso personal)
-- "Pago de luz de la oficina" + categoria "Servicios" → facturable: true (servicio indispensable para operación)
-- "Compra de ropa casual" + categoria "Otros" → facturable: false (gasto personal)`;
+- "Pago de luz de la CASA" + categoria "Servicios" → facturable: false (servicio básico de vivienda)
+- "Pago de luz de la OFICINA" + categoria "Servicios" → facturable: true (servicio indispensable para operación)
+- "Apuestas en casino" + categoria "Entretenimiento" → facturable: false (juegos de azar NO deducibles)
+- "Suscripción Netflix" + categoria "Entretenimiento" → facturable: false (entretenimiento personal)
+- "Compra de ropa casual" + categoria "Otros" → facturable: false (gasto personal)
+- "Multa de tránsito" + categoria "Otros" → facturable: false (sanción NO deducible)
+- "Gasolina para auto de reparto" + categoria "Transporte" → facturable: true (vehículo de la empresa)
+- "Compra de materia prima" + categoria "Otros" → facturable: true (insumo indispensable para producción)`;
 
 async function buildChatPrompt(question: string, userId: string): Promise<string> {
   const { data: gastos } = await supabase.from("gastos").select("monto,fecha,descripcion,cfdi_estado,categoria").eq("user_id", userId).order("fecha", { ascending: false }).limit(20);
