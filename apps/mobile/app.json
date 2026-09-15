@@ -21,7 +21,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-local-authentication"
+      "expo-local-authentication",
+      "expo-web-browser"
     ]
   }
 }

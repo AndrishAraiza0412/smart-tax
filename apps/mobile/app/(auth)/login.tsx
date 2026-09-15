@@ -17,7 +17,7 @@ import { supabase } from "../../lib/supabase";
 
 /**
  * Inicio de sesión con email/contraseña (Supabase Auth), Face ID nativo y
- * accesos sociales (próximamente). Al autenticar redirige a `/(app)`.
+ * accesos sociales (Apple/Google OAuth). Al autenticar redirige a `/(app)`.
  */
 const LoginSchema = z.object({ email: z.string().trim().email("Correo inválido"), password: z.string().min(1, "Ingresa tu contraseña") });
 type LoginValues = z.infer<typeof LoginSchema>;
@@ -26,22 +26,46 @@ export default function LoginScreen(): React.JSX.Element {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginValues>({ resolver: zodResolver(LoginSchema), defaultValues: { email: "", password: "" } });
+
   const submit = async (values: LoginValues): Promise<void> => {
     const { error } = await supabase.auth.signInWithPassword(values);
     if (error) Alert.alert("No pudimos iniciar sesión", error.message);
     else router.replace("/(app)");
   };
+
   const faceId = async (): Promise<void> => {
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
     const enrolled = await LocalAuthentication.isEnrolledAsync();
     if (!hasHardware || !enrolled) { Alert.alert("Biometría no disponible", "Configura Face ID en tu iPhone para usarlo."); return; }
-    const result = await LocalAuthentication.authenticateAsync({ promptMessage: "Ingresa a Smart Tax" });
+    const result = await LocalAuthentication.authenticateAsync({ promptMessage: "Ingresa a Smart Tax", fallbackLabel: "Usar contraseña" });
     if (!result.success) return;
-    const { data } = await supabase.auth.getSession();
-    if (data.session) router.replace("/(app)");
-    else Alert.alert("Identidad verificada", "Ahora ingresa tu correo y contraseña para iniciar sesión.");
+    // FaceID successful - sign in with stored credentials or use a secure approach
+    // For now, we'll alert the user to use email/password since we don't store credentials
+    Alert.alert("Face ID verificado", "Tu identidad ha sido verificada. Por seguridad, ingresa tu correo y contraseña para completar el inicio de sesión.");
   };
-  const social = (name: string): void => { Alert.alert(`Continuar con ${name}`, "Disponible próximamente. Usa tu correo por ahora."); };
+
+  const socialLogin = async (provider: "apple" | "google"): Promise<void> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${process.env['EXPO_PUBLIC_SUPABASE_URL']}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+      if (data.url) {
+        // In Expo, we need to open the OAuth URL in a browser
+        const { openAuthSessionAsync } = await import("expo-web-browser");
+        const result = await openAuthSessionAsync(data.url, `${process.env['EXPO_PUBLIC_SUPABASE_URL']}/auth/callback`);
+        if (result.type === "success") {
+          router.replace("/(app)");
+        }
+      }
+    } catch (error) {
+      Alert.alert("Error en login social", error instanceof Error ? error.message : "No se pudo iniciar sesión con " + provider);
+    }
+  };
+
   return <ScrollView className="flex-1 bg-canvas dark:bg-night" contentContainerClassName="pb-8">
     <LinearGradient colors={["#1D3BBF", "#2547E8"]} className="rounded-b-[28px] px-5 pb-16">
       <SafeAreaView edges={["top"]}>
@@ -91,8 +115,8 @@ export default function LoginScreen(): React.JSX.Element {
         <View className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
       </View>
       <View className="flex-row gap-3">
-        <Pressable className="min-h-11 flex-1 flex-row items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5" onPress={() => social("Apple")}><FontAwesome name="apple" size={18} color="#0F172A" /><Text className="ml-2 font-sans text-sm font-semibold text-ink dark:text-white">Apple</Text></Pressable>
-        <Pressable className="min-h-11 flex-1 flex-row items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5" onPress={() => social("Google")}><FontAwesome name="google" size={16} color="#DB4437" /><Text className="ml-2 font-sans text-sm font-semibold text-ink dark:text-white">Google</Text></Pressable>
+        <Pressable className="min-h-11 flex-1 flex-row items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5" onPress={() => socialLogin("apple")}><FontAwesome name="apple" size={18} color="#0F172A" /><Text className="ml-2 font-sans text-sm font-semibold text-ink dark:text-white">Apple</Text></Pressable>
+        <Pressable className="min-h-11 flex-1 flex-row items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5" onPress={() => socialLogin("google")}><FontAwesome name="google" size={16} color="#DB4437" /><Text className="ml-2 font-sans text-sm font-semibold text-ink dark:text-white">Google</Text></Pressable>
       </View>
 
       <View className="mt-5 flex-row justify-center"><Text className="font-sans text-sm text-muted dark:text-slate-400">¿No tienes una cuenta? </Text><Link className="font-sans text-sm font-semibold text-primary" href="/(auth)/register">Regístrate gratis →</Link></View>
