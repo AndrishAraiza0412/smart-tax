@@ -29,6 +29,26 @@ export const MetodoPagoSchema = z.enum(metodosPago);
 export const FormaPagoSchema = z.enum(formasPago);
 export const TipoRelacionSchema = z.enum(tiposRelacion);
 
+export const CATEGORIAS = [
+  "Alimentación",
+  "Transporte",
+  "Servicios",
+  "Salud",
+  "Oficina",
+  "Educación",
+  "Entretenimiento",
+  "Otros",
+] as const;
+
+export const GastoSchema = z.object({
+  descripcion: z.string().min(1),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  monto: z.number().positive(),
+  categoria: z.enum(CATEGORIAS),
+  facturable: z.boolean().default(true),
+});
+
+/** @deprecated Use GastoSchema instead. Kept for backward compatibility with Edge Functions. */
 export const GastoManualSchema = z.object({
   descripcion: z.string().trim().min(1),
   fecha: z.string().date(),
