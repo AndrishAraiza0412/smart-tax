@@ -33,11 +33,34 @@ export function useGastos(filters: Filters = {}) {
 }
 
 /**
- * Inserta un gasto para el usuario actual. La columna `user_id` debe venir
- * del backend/llamador; las políticas RLS validan la propiedad.
+ * Inserta un gasto para el usuario actual. Usa la REST API directamente
+ * con el access token del usuario para evitar problemas de RLS con el cliente anon.
  */
 export async function insertGasto(payload: Record<string, unknown>) {
-  const { data, error } = await supabase.from("gastos").insert(payload).select().single();
-  if (error) throw error;
-  return data;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("Usuario no autenticado - sin sesión");
+  if (!session.user) throw new Error("Usuario no autenticado - sin usuario");
+
+  const supabaseUrl = process.env["EXPO_PUBLIC_SUPABASE_URL"];
+  const anonKey = process.env["EXPO_PUBLIC_SUPABASE_ANON_KEY"];
+  if (!supabaseUrl || !anonKey) throw new Error("Configuración Supabase faltante");
+
+  const res = await fetch(`${supabaseUrl}/rest/v1/gastos`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: anonKey,
+      Authorization: `Bearer ${session.access_token}`,
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ ...payload, user_id: session.user.id }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: "Error desconocido" }));
+    throw new Error(err.message || `Error ${res.status}: ${res.statusText}`);
+  }
+
+  const data = await res.json();
+  return data[0];
 }
