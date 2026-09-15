@@ -1,34 +1,90 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 /**
- * Edge Function `asesor-ia`: chat fiscal con IA (POST { question }).
+ * Edge Function `asesor-ia`: chat fiscal + detección de facturable (POST { action, ... }).
  *
- * Flujo: valida el JWT del usuario → lee sus últimos 20 gastos y su perfil
- * fiscal con service_role → los inyecta como contexto en el prompt → llama
- * a Gemini (`gemini-3.1-flash-lite`) → devuelve { answer }.
- * Requiere el secreto `GEMINI_API_KEY`. Sin clave responde 503 y la app
- * usa sus respuestas locales de respaldo.
+ * Acciones:
+ * - chat: { question } → respuesta del asesor fiscal
+ * - detect_facturable: { descripcion, categoria } → { facturable: boolean, confidence: number, razon: string }
+ *
+ * Requiere el secreto `GEMINI_API_KEY`. Sin clave responde 503.
  */
 
 const json = (body: unknown, status = 200): Response => Response.json(body, { status });
 const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
 
-type Gasto = { monto: number | string; fecha: string; descripcion: string; cfdi_estado: string | null; categoria: string | null };
-
-const SYSTEM = `Eres el asesor fiscal con IA de SmartTax, app mexicana de gastos y facturación.
+const SYSTEM_CHAT = `Eres el asesor fiscal con IA de SmartTax, app mexicana de gastos y facturación.
 Hablas español, tono claro y breve (máximo 120 palabras). Temas: deducciones ISR, CFDI 4.0,
 usos de CFDI, regímenes fiscales SAT, IVA 16%, métodos de pago PUE/PPD.
 Si preguntan algo fuera de impuestos mexicanos, redirige amablemente al tema fiscal.
 Nunca inventes leyes: si no estás seguro, dilo y sugiere consultar a un contador.`;
 
-export async function buildPrompt(question: string, userId: string): Promise<string> {
+const SYSTEM_FACTURABLE = `Eres un experto fiscal mexicano que determina si un gasto es facturable (deducible ante el SAT).
+Responde SOLO en JSON: { "facturable": boolean, "confidence": number (0-100), "razon": "explicación breve en español" }.
+
+CRITERIOS PARA SER FACTURABLE (deducible ISR):
+- Gasto estrictamente indispensable para la actividad económica del contribuyente
+- Tiene comprobante fiscal válido (CFDI 4.0) con RFC del emisor y receptor correctos
+- Pagado mediante medios electrónicos (transferencia, tarjeta, cheque nominativo) - NO efectivo
+- IVA acreditado correctamente (16% o 8% frontera)
+- Relacionado directamente con la actividad empresarial/profesional
+
+NO FACTURABLE (no deducible):
+- Gastos personales (comida familiar, ropa, entretenimiento personal)
+- Pagos en efectivo mayores a $2,000 MXN
+- Gastos sin CFDI o con CFDI incorrecto
+- Multas, sanciones, intereses moratorios
+- Gastos de representación excesivos sin comprobante
+- Combustible para uso personal (no vehicular de la empresa)
+
+EJEMPLOS:
+- "Almuerzo con cliente en restaurante" + categoria "Alimentación" → facturable: true (gasto de representación con cliente)
+- "Compra de laptop para trabajo" + categoria "Oficina" → facturable: true (activo fijo/ herramienta de trabajo)
+- "Cena familiar en restaurante" + categoria "Alimentación" → facturable: false (gasto personal)
+- "Recarga de gasolina para auto personal" + categoria "Transporte" → facturable: false (uso personal)
+- "Pago de luz de la oficina" + categoria "Servicios" → facturable: true (servicio indispensable para operación)
+- "Compra de ropa casual" + categoria "Otros" → facturable: false (gasto personal)`;
+
+async function buildChatPrompt(question: string, userId: string): Promise<string> {
   const { data: gastos } = await supabase.from("gastos").select("monto,fecha,descripcion,cfdi_estado,categoria").eq("user_id", userId).order("fecha", { ascending: false }).limit(20);
-  const rows = (gastos ?? []) as Gasto[];
+  const rows = (gastos ?? []) as { monto: number | string; fecha: string; descripcion: string; cfdi_estado: string | null; categoria: string | null }[];
   const total = rows.reduce((s, g) => s + Number(g.monto), 0);
   const { data: profile } = await supabase.from("profiles").select("rfc,regimen_fiscal,razon_social").eq("id", userId).single();
   const recent = rows.slice(0, 5).map((g) => `${g.fecha} ${g.descripcion} $${Number(g.monto).toFixed(2)} (${g.cfdi_estado ?? "pendiente"})`).join("\n");
-  return `${SYSTEM}\n\nContexto del usuario:\n- RFC: ${profile?.rfc ?? "sin registrar"} | Régimen: ${profile?.regimen_fiscal ?? "sin registrar"}\n- Gastos registrados: ${rows.length}, total: $${total.toFixed(2)}\n- Recientes:\n${recent || "(sin gastos)"}\n\nPregunta: ${question}`;
+  return `${SYSTEM_CHAT}\n\nContexto del usuario:\n- RFC: ${profile?.rfc ?? "sin registrar"} | Régimen: ${profile?.regimen_fiscal ?? "sin registrar"}\n- Gastos registrados: ${rows.length}, total: $${total.toFixed(2)}\n- Recientes:\n${recent || "(sin gastos)"}\n\nPregunta: ${question}`;
 }
+
+async function detectFacturable(descripcion: string, categoria: string): Promise<{ facturable: boolean; confidence: number; razon: string }> {
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("AI not configured");
+
+  const prompt = `${SYSTEM_FACTURABLE}\n\nAnaliza este gasto:\n- Descripción: "${descripcion}"\n- Categoría: "${categoria}"\n\nResponde SOLO con el JSON.`;
+
+  const gemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 200, temperature: 0.2 } }),
+  });
+  if (!gemini.ok) throw new Error("AI provider failed");
+  const result: unknown = await gemini.json();
+  const text = typeof result === "object" && result !== null && "candidates" in result && Array.isArray(result.candidates)
+    ? result.candidates.map((c: unknown) => typeof c === "object" && c !== null && "content" in c && typeof c.content === "object" && c.content !== null && "parts" in c.content && Array.isArray(c.content.parts) ? c.content.parts.map((p: unknown) => typeof p === "object" && p !== null && "text" in p ? String(p.text) : "").join("") : "").join("")
+    : "";
+  if (!text) throw new Error("Empty AI response");
+  try {
+    const parsed = JSON.parse(text);
+    return { facturable: Boolean(parsed.facturable), confidence: Number(parsed.confidence) ?? 80, razon: String(parsed.razon ?? "Análisis automático") };
+  } catch {
+    // Fallback heurístico si el JSON falla
+    const lower = descripcion.toLowerCase();
+    const personal = ["familiar", "personal", "cine", "cine", "netflix", "spotify", "ropa casual", "supermercado familiar", "cena familiar", "almuerzo familiar"];
+    const esPersonal = personal.some(p => lower.includes(p));
+    return { facturable: !esPersonal, confidence: 70, razon: esPersonal ? "Detectado como gasto personal por palabras clave" : "Análisis heurístico: parece gasto de actividad económica" };
+  }
+}
+
+const json = (body: unknown, status = 200): Response => Response.json(body, { status });
+const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
 
 Deno.serve(async (request: Request): Promise<Response> => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -39,13 +95,29 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   let body: unknown;
   try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
+
+  const action = typeof body === "object" && body !== null && "action" in body ? String(body.action) : "chat";
+
+  if (action === "detect_facturable") {
+    const descripcion = typeof body === "object" && body !== null && "descripcion" in body ? String(body.descripcion) : "";
+    const categoria = typeof body === "object" && body !== null && "categoria" in body ? String(body.categoria) : "";
+    if (!descripcion || !categoria) return json({ error: "Missing descripcion or categoria" }, 400);
+    try {
+      const result = await detectFacturable(descripcion, categoria);
+      return json(result);
+    } catch (e) {
+      return json({ error: "AI detection failed", detail: String(e) }, 502);
+    }
+  }
+
+  // Default: chat
   const question = typeof body === "object" && body !== null && "question" in body && typeof body.question === "string" ? body.question.trim() : "";
   if (!question) return json({ error: "Missing question" }, 400);
 
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) return json({ error: "AI not configured" }, 503);
 
-  const prompt = await buildPrompt(question, user.id);
+  const prompt = await buildChatPrompt(question, user.id);
   const gemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "content-type": "application/json" },

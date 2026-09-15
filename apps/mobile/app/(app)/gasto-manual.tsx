@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Alert, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,6 +11,7 @@ import { Label } from "../../components/ui/label";
 import { Select } from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
 import { insertGasto } from "../../hooks/useGastos";
+import { supabase } from "../../lib/supabase";
 
 type Values = z.input<typeof GastoSchema>;
 const CATEGORIAS = ["Alimentación", "Transporte", "Servicios", "Salud", "Oficina", "Educación", "Entretenimiento", "Otros"] as const;
@@ -20,7 +22,44 @@ function SectionLabel({ children }: { children: React.ReactNode }): React.JSX.El
 }
 
 export default function GastoManual(): React.JSX.Element {
-  const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({ resolver: zodResolver(GastoSchema), defaultValues: defaults });
+  const { control, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<Values>({ resolver: zodResolver(GastoSchema), defaultValues: defaults });
+  const [detecting, setDetecting] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<{ facturable: boolean; razon: string } | null>(null);
+
+  const descripcion = watch("descripcion");
+  const categoria = watch("categoria");
+
+  // Auto-detect facturable when descripcion and categoria change
+  useEffect(() => {
+    if (!descripcion.trim() || !categoria) return;
+    const timer = setTimeout(async () => {
+      setDetecting(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`${process.env['EXPO_PUBLIC_SUPABASE_URL']}/functions/v1/asesor-ia`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: process.env['EXPO_PUBLIC_SUPABASE_ANON_KEY'] ?? "",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action: "detect_facturable", descripcion, categoria }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAiSuggestion({ facturable: data.facturable, razon: data.razon });
+          setValue("facturable", data.facturable, { shouldValidate: true });
+        }
+      } catch {
+        // Silencioso: el usuario puede cambiar manualmente
+      } finally {
+        setDetecting(false);
+      }
+    }, 800); // debounce
+    return () => clearTimeout(timer);
+  }, [descripcion, categoria, control]);
+
   const submit = async (values: Values) => {
     try {
       const parsed = GastoSchema.parse(values);
@@ -30,7 +69,9 @@ export default function GastoManual(): React.JSX.Element {
       Alert.alert("No pudimos registrar el gasto", error instanceof Error ? error.message : "Intenta de nuevo");
     }
   };
+
   const field = (name: keyof Values, label: string, numeric = false, placeholder = "") => <View className="mt-3"><Label>{label}</Label><View className="mt-1.5"><Controller control={control} name={name} render={({ field: input }) => <Input value={String(input.value ?? "")} placeholder={placeholder} keyboardType={numeric ? "decimal-pad" : "default"} onChangeText={(value) => input.onChange(numeric ? Number(value) : value)} />} /></View>{errors[name] && <Text className="mb-1 mt-1 text-sm text-red-600">{String(errors[name]?.message ?? "Campo inválido")}</Text>}</View>;
+
   return <ScrollView className="flex-1 bg-canvas dark:bg-night" contentContainerClassName="pb-8">
     <SafeAreaView edges={["top"]}>
       <View className="mt-2 px-5"><Text className="font-sans text-[22px] font-bold text-ink dark:text-white">Registrar gasto</Text><Text className="mt-1 font-sans text-[13px] text-muted dark:text-slate-400">Agrega un gasto manual</Text></View>
@@ -40,8 +81,12 @@ export default function GastoManual(): React.JSX.Element {
           {field("descripcion", "Descripción", false, "Ej. Starbucks Centro")}
           {field("fecha", "Fecha (AAAA-MM-DD)")}
           {field("monto", "Monto", true, "0.00")}
-          <View className="mt-3"><Label>Categoría</Label><View className="mt-1.5 rounded-md border border-slate-300 bg-white dark:border-white/10 dark:bg-white/5"><Controller control={control} name="categoria" render={({ field: input }) => <Select selectedValue={input.value} onValueChange={input.onChange}>{CATEGORIAS.map((item) => <Select.Item key={item} label={item} value={item} />)}</Select>} /></View></View>
-          <View className="mt-5 flex-row items-center justify-between"><Label>Facturable</Label><Controller control={control} name="facturable" render={({ field: input }) => <Switch value={input.value} onValueChange={input.onChange} />} /></View>
+          <View className="mt-3"><Label>Categoría</Label><View className="mt-1.5 rounded-md border border-slate-300 bg-white dark:border-white/10 dark:bg-white/5"><Controller control={control} name="categoria" render={({ field: input }) => <Select selectedValue={input.value} onValueChange={input.onChange}>{["Alimentación", "Transporte", "Servicios", "Salud", "Oficina", "Educación", "Entretenimiento", "Otros"].map((item) => <Select.Item key={item} label={item} value={item} />)}</Select>} /></View></View>
+          <View className="mt-5 flex-row items-center justify-between">
+            <Label>Facturable</Label>
+            <Controller control={control} name="facturable" render={({ field: input }) => <Switch value={input.value} onValueChange={input.onChange} />} />
+          </View>
+          {aiSuggestion && <View className="mt-3 p-3 rounded-lg bg-skyTint border border-skyBorder"><Text className="font-sans text-xs text-skyText">🤖 IA sugiere: <Text className="font-semibold">{aiSuggestion.facturable ? "Facturable" : "No facturable"}</Text> — {aiSuggestion.razon}</Text>{detecting && <Text className="font-sans text-xs text-skyText mt-1">Analizando…</Text>}</View>}
         </View>
         <Button className="mt-5 rounded-xl" disabled={isSubmitting} onPress={() => void handleSubmit(submit)()}>{isSubmitting ? "Guardando…" : "Guardar gasto"}</Button>
       </View>
