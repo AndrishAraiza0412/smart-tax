@@ -52,7 +52,7 @@ export default function Configuraciones(): React.JSX.Element {
       if (data) { setRfc((data.rfc as string | null) ?? ""); setRegimen((data.regimen_fiscal as string | null) ?? ""); }
     })();
   }, []);
-  const [autoDetect, setAutoDetect] = useState(true); const [autoDownload, setAutoDownload] = useState(true); const [biometria, setBiometria] = useState(true);
+  const [autoDetect, setAutoDetect] = useState(true); const [biometria, setBiometria] = useState(true);
   const { colorScheme, setColorScheme } = useColorScheme();
   const dark = colorScheme === "dark";
   const save = async () => { const { data: { user } } = await supabase.auth.getUser(); if (!user) return; const { error } = await supabase.from("profiles").update({ rfc, regimen_fiscal: regimen }).eq("id", user.id); Alert.alert(error ? "No se pudo guardar" : "Perfil actualizado", error?.message); };
@@ -75,8 +75,8 @@ export default function Configuraciones(): React.JSX.Element {
 
       <LinearGradient colors={["#1D3BBF", "#2547E8"]} className="mx-5 mt-4 rounded-[20px] p-5">
         <Text className="font-sans text-lg font-bold text-white">Pasa a Plan Pro IA</Text>
-        <Text className="mt-1 font-sans text-[13px] text-white/75">Timbrado ilimitado y escaneo con inteligencia artificial.</Text>
-        <Link href="/(app)/planes" asChild><Pressable className="mt-3 items-center rounded-xl bg-white py-3"><Text className="font-sans text-sm font-bold text-primary">Ver Planes y Facturación ›</Text></Pressable></Link>
+        <Text className="mt-1 font-sans text-[13px] text-white/75">Gastos ilimitados y escaneo con inteligencia artificial.</Text>
+        <Link href="/(app)/planes" asChild><Pressable className="mt-3 items-center rounded-xl bg-white py-3"><Text className="font-sans text-sm font-bold text-primary">Ver Planes ›</Text></Pressable></Link>
       </LinearGradient>
 
       <Section title="PERFIL FISCAL">
@@ -101,8 +101,6 @@ export default function Configuraciones(): React.JSX.Element {
 
       <Section title="INTELIGENCIA ARTIFICIAL">
         <ToggleRow icon="zap" label="Auto-detección de gastos" value={autoDetect} onChange={setAutoDetect} />
-        <ToggleRow icon="download" label="Descarga de facturas" value={autoDownload} onChange={setAutoDownload} />
-        <Row icon="award" label="Certificados Digitales" value="E-firma" />
         <ToggleRow icon="smartphone" label="Biometría (Face ID)" value={biometria} onChange={setBiometria} />
       </Section>
 

@@ -8,20 +8,15 @@ import { useGastos } from "../../hooks/useGastos";
 import { ThemeToggle } from "../../components/ui/theme-toggle";
 import type { Gasto } from "../../hooks/useGastos";
 
-/**
- * Panel principal. Todo es calculado desde los gastos reales del usuario:
- * total del mes en curso, deducible (CFDI timbrado), barras de 12 meses,
- * dona por categoría y lista de recientes. Sin gastos muestra estados vacíos.
- */
 const CIRC = 2 * Math.PI * 48;
 const INITIALS = ["E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const DONUT_COLORS = ["#2547E8", "#10B981", "#F43F5E", "#0EA5E9", "#8B5CF6"];
 
-function statusPill(estado: string | null | undefined): { label: string; box: string; text: string } {
-  if (estado === "timbrado") return { label: "Facturable", box: "border-emeraldBorder bg-emeraldTint", text: "text-emeraldText" };
-  if (estado === "error") return { label: "Sin factura", box: "border-roseBorder bg-roseTint", text: "text-roseText" };
-  return { label: "Pendiente", box: "border-skyBorder bg-skyTint", text: "text-skyText" };
+function facturablePill(facturable: boolean | null | undefined): { label: string; box: string; text: string } {
+  if (facturable === true) return { label: "Facturable", box: "border-emeraldBorder bg-emeraldTint", text: "text-emeraldText" };
+  if (facturable === false) return { label: "No facturable", box: "border-roseBorder bg-roseTint", text: "text-roseText" };
+  return { label: "Sin clasificar", box: "border-skyBorder bg-skyTint", text: "text-skyText" };
 }
 
 function iconFor(categoria: string | null | undefined): { icon: "car" | "cart" | "briefcase" | "plus" | "zap" | "file"; tint: string; color: string } {
@@ -48,7 +43,7 @@ export default function Dashboard(): React.JSX.Element {
   const inMonth = (g: Gasto): boolean => { const [y, m] = g.fecha.split("-").map(Number); return y === now.getFullYear() && m === now.getMonth() + 1; };
   const monthRows = gastos.filter(inMonth);
   const monthTotal = monthRows.reduce((s, g) => s + Number(g.monto), 0);
-  const deducible = monthRows.filter((g) => g.cfdi_estado === "timbrado").reduce((s, g) => s + Number(g.monto), 0);
+  const facturableTotal = monthRows.filter((g) => g.facturable === true).reduce((s, g) => s + Number(g.monto), 0);
 
   const bars = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
@@ -82,12 +77,12 @@ export default function Dashboard(): React.JSX.Element {
         <Text className="font-sans font-bold text-white" style={{ fontSize: heroSize, lineHeight: heroSize + 6 }}>{loading ? "…" : fmt(monthTotal)}</Text>
         <View className="mt-4 flex-row gap-3">
           <View className="flex-1 rounded-2xl border border-white/20 bg-white/10 p-3">
-            <Text className="text-[11px] font-semibold text-white/75">Deducible ISR</Text>
-            <Text className="mt-1 font-sans text-lg font-bold text-white">{loading ? "…" : fmt(deducible)}</Text>
-            <Text className="mt-0.5 text-[11px] font-semibold text-emerald-300">CFDI timbrado</Text>
+            <Text className="text-[11px] font-semibold text-white/75">Facturable</Text>
+            <Text className="mt-1 font-sans text-lg font-bold text-white">{loading ? "…" : fmt(facturableTotal)}</Text>
+            <Text className="mt-0.5 text-[11px] font-semibold text-emerald-300">Con factura</Text>
           </View>
           <View className="flex-1 rounded-2xl border border-white/20 bg-white/10 p-3">
-            <Text className="text-[11px] font-semibold text-white/75">Facturable</Text>
+            <Text className="text-[11px] font-semibold text-white/75">Total mes</Text>
             <Text className="mt-1 font-sans text-lg font-bold text-white">{loading ? "…" : fmt(monthTotal)}</Text>
             <Text className="mt-0.5 text-[11px] font-semibold text-white/75">{monthRows.length} movimientos</Text>
           </View>
@@ -150,14 +145,14 @@ export default function Dashboard(): React.JSX.Element {
     </View>
     <View className="mx-5 mt-2 gap-2">
       {loading ? <Text className="text-muted dark:text-slate-400">Cargando…</Text> : gastos.length === 0 ? <View className="items-center rounded-[20px] border border-slate-200 bg-white dark:border-white/10 dark:bg-nightcard p-6"><Text className="font-sans text-sm text-muted dark:text-slate-400">Sin movimientos. Registra tu primer gasto ⭢</Text></View> : gastos.slice(0, 5).map((g) => {
-        const v = iconFor(g.categoria); const pill = statusPill(g.cfdi_estado);
+        const v = iconFor(g.categoria); const pill = facturablePill(g.facturable);
         return <View key={g.id} className="flex-row items-center rounded-[20px] border border-slate-200 bg-white dark:border-white/10 dark:bg-nightcard px-4 py-3.5">
           <View className={`h-11 w-11 items-center justify-center rounded-xl ${v.tint}`}>
             {v.icon === "car" ? <MaterialCommunityIcons name="car" size={20} color={v.color} /> : v.icon === "cart" ? <Feather name="shopping-cart" size={20} color={v.color} /> : v.icon === "briefcase" ? <Feather name="briefcase" size={20} color={v.color} /> : v.icon === "plus" ? <Feather name="plus" size={20} color={v.color} /> : v.icon === "zap" ? <Feather name="zap" size={20} color={v.color} /> : <Feather name="file-text" size={20} color={v.color} />}
           </View>
           <View className="ml-3 flex-1">
             <Text className="font-sans text-[15px] font-semibold text-ink dark:text-white">{g.descripcion}</Text>
-            <Text className="mt-0.5 font-sans text-xs text-faint">{shortDate(g.fecha)} · {g.cfdi_estado === "timbrado" ? "Facturado" : "Pendiente"}</Text>
+            <Text className="mt-0.5 font-sans text-xs text-faint">{shortDate(g.fecha)}</Text>
           </View>
           <View className="items-end">
             <Text className="font-sans text-[17px] font-bold text-ink dark:text-white">{fmt(Number(g.monto))}</Text>

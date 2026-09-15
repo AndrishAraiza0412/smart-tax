@@ -6,20 +6,24 @@ import { Input } from "../../components/ui/input";
 import { useGastos } from "../../hooks/useGastos";
 
 /** Lista de gastos con filtros por estado CFDI y rango de fechas, con pull-to-refresh y paginación. */
-const FILTERS = ["Todos", "Facturable", "Deducible", "Sin factura"] as const;
+const FILTERS = ["Todos", "Facturable", "No facturable"] as const;
 
-function pillFor(estado: string | null | undefined): { label: string; classes: string; text: string } {
-  if (estado === "timbrado") return { label: "Facturable", classes: "border-emeraldBorder bg-emeraldTint", text: "text-emeraldText" };
-  if (estado === "error") return { label: "Sin factura", classes: "border-roseBorder bg-roseTint", text: "text-roseText" };
-  return { label: "Deducible", classes: "border-skyBorder bg-skyTint", text: "text-skyText" };
+function pillFor(facturable: boolean): { label: string; classes: string; text: string } {
+	return facturable
+		? { label: "Facturable", classes: "border-emeraldBorder bg-emeraldTint", text: "text-emeraldText" }
+		: { label: "No facturable", classes: "border-roseBorder bg-roseTint", text: "text-roseText" };
 }
 
 export default function MisGastos(): React.JSX.Element {
   const [active, setActive] = useState<(typeof FILTERS)[number]>("Todos");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const estadoQuery = active === "Todos" ? undefined : active === "Facturable" ? "timbrado" : active === "Sin factura" ? "error" : "pendiente";
-  const { gastos, loading, refreshing, error, refresh, loadMore } = useGastos({ estado: estadoQuery, from: from || undefined, to: to || undefined });
+	const estadoQuery = active === "Todos" ? undefined : active === "Facturable" ? true : false;
+	const { gastos, loading, refreshing, error, refresh, loadMore } = useGastos({
+		...(estadoQuery === undefined ? {} : { facturable: estadoQuery }),
+		from: from || undefined,
+		to: to || undefined,
+	});
   const total = gastos.reduce((sum, g) => sum + Number(g.monto), 0);
   return <View className="flex-1 bg-canvas dark:bg-night">
     <SafeAreaView edges={["top"]} className="flex-1">
@@ -65,12 +69,12 @@ export default function MisGastos(): React.JSX.Element {
           <Text className="mt-3 font-sans text-sm text-muted dark:text-slate-400">{loading ? "Cargando…" : "No hay gastos con estos filtros."}</Text>
         </View>}
         renderItem={({ item }) => {
-          const pill = pillFor(item.cfdi_estado);
+			  const pill = pillFor(item.facturable);
           return <View className="flex-row items-center rounded-[20px] border border-slate-200 bg-white dark:border-white/10 dark:bg-nightcard px-4 py-3.5">
             <View className="h-11 w-11 items-center justify-center rounded-xl bg-skyTint"><Feather name="file-text" size={20} color="#2547E8" /></View>
             <View className="ml-3 flex-1">
               <Text className="font-sans text-[15px] font-semibold text-ink dark:text-white">{item.descripcion}</Text>
-              <Text className="mt-0.5 font-sans text-xs text-faint">{item.fecha} · {item.uso_cfdi ?? "Sin uso CFDI"}</Text>
+				  <Text className="mt-0.5 font-sans text-xs text-faint">{item.fecha}</Text>
             </View>
             <View className="items-end">
               <Text className="font-sans text-[17px] font-bold text-ink dark:text-white">${Number(item.monto).toFixed(2)}</Text>
