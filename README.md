@@ -12,7 +12,7 @@ Google Stitch, replicados con NativeWind. Stack 100% gratuito en sandbox.
 | UI | Diseños Stitch, modo claro/oscuro, Inter, expo-linear-gradient, react-native-svg |
 | Forms/Validación | React Hook Form + Zod (`packages/shared`) |
 | Backend/DB | Supabase (PostgreSQL + Auth + RLS + Storage + Edge Functions) |
-| Asesor IA | Edge Function `asesor-ia` + Gemini (`gemini-3.1-flash-lite`) |
+| Asesor IA | Edge Function `asesor-ia` + Gemini 2.0 Flash (chat con memoria + contexto real) |
 | CFDI 4.0 | Edge Function `timbrado` + Factura.com Sandbox (pendiente de credenciales) |
 | Open Banking | Belvo Sandbox: widget + webhook `belvo-webhook` (pendiente de credenciales) |
 | Nativo extra | Face ID (`expo-local-authentication`), cámara/galería (`expo-image-picker`) |
@@ -84,7 +84,9 @@ supabase functions deploy asesor-ia
 supabase secrets set GEMINI_API_KEY=<tu-key-de-aistudio.google.com>
 ```
 
-Sin clave, el chat usa respuestas locales de respaldo (funciona offline).
+**Nota:** El asesor tiene dos modos:
+- **Con GEMINI_API_KEY:** chat en vivo con Gemini 2.0 Flash, con contexto real del usuario (RFC, régimen, últimos gastos) y memoria conversacional (últimos 6 mensajes). Respuestas naturales en español mexicano o inglés.
+- **Sin clave:** fallback a respuestas locales predefinidas (más cálidas desde la versión 6), funciona offline.
 
 ### 4. Funciones pendientes de credenciales externas
 
@@ -120,12 +122,15 @@ pnpm expo start --web    # vista web (sin estilos NativeWind completos)
    recientes — todo calculado de `gastos` en tiempo real.
 4. **Escanear**: foto/galería → extracción → gasto en `borrador`.
 5. **Nuevo gasto**: formulario SAT completo → guarda y timbra (requiere `timbrado`).
-6. **Asesor**: chat con Gemini contextualizado con tus gastos y perfil.
+6. **Asesor**: chat con IA con memoria conversacional, contexto real de gastos/perfil, respuestas en tono amable (fallback local si no hay conexión).
 7. **Configuración**: perfil fiscal, tema, IA, Belvo, planes y cierre de sesión.
 
 ## Estado y pendientes
 
-- ✅ Auth, dashboard dinámico, gastos, escanear, asesor IA, config, dark mode
+- ✅ Auth, dashboard dinámico, gastos, escanear, asesor IA con chat + memoria, config, dark mode
+- ✅ Asesor IA: Gemini 2.0 Flash con contexto real + fallback local amable
+- ✅ Détección de facturables con IA (detect_facturable)
+- ✅ Análisis de tickets/fotos con IA (analyze_ticket)
 - ⏳ Timbrado real (ocupa credenciales Factura.com sandbox)
 - ⏳ Belvo real (ocupa credenciales sandbox + webhook configurado)
 - ⏳ Cobro de planes (Stripe Payment Links test mode por cablear)
