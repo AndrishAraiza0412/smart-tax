@@ -65,6 +65,7 @@ const translations = {
     asesor: {
       title: "Asesor Fiscal IA", online: "En línea · SAT 2026", greeting: "Hola, soy tu asesor fiscal con IA. ¿En qué te ayudo hoy?",
       placeholder: "Pregunta sobre impuestos…", typing: "Escribiendo…",
+      offline: "Sin conexión con la IA, te respondo con lo básico:", repeat: "Eso te lo comenté arriba. ¿Qué parte quieres que te explique mejor?",
       sug: ["¿Qué puedo deducir?", "Usos de CFDI", "¿Cómo timbro?", "Mi total del mes"],
       aDeduc: "{{total}}|{{count}}|Buena pregunta para ahorrar. En corto: puedes deducir lo que de verdad necesitas para trabajar, siempre que tengas factura (CFDI) y lo hayas pagado con tarjeta o transferencia, no en efectivo. Hasta ahora llevas {{total}} en {{count}} gasto(s); SmartTax revisa cada uno y te avisa si parece deducible. ¿Quieres que veamos algún gasto en particular?",
       aCfdi: "{{sample}}|{{more}}|El uso de CFDI es básicamente decirle al SAT para qué usaste la compra. Los más comunes son {{sample}}{{#if more}}, y hay {{more}} más{{/if}}. Si es un gasto normal de tu trabajo, casi siempre te sirve G03 (gastos en general). ¿Qué compraste? Te digo cuál te conviene.",
@@ -199,6 +200,7 @@ const translations = {
     asesor: {
       title: "AI Tax Advisor", online: "Online · SAT 2026", greeting: "Hi, I'm your AI tax advisor. How can I help today?",
       placeholder: "Ask about taxes…", typing: "Typing…",
+      offline: "Can't reach the AI right now, here's the basic answer:", repeat: "I mentioned that above. Which part would you like me to explain better?",
       sug: ["What can I deduct?", "CFDI uses", "How do I invoice?", "My month total"],
       aDeduc: "{{total}}|{{count}}|Great question if you want to save. In short: you can deduct what you truly need for your work, as long as you have an invoice (CFDI) and paid by card or transfer, not cash. So far you have {{total}} across {{count}} expense(s); SmartTax checks each one and flags whether it looks deductible. Want to go over a specific expense?",
       aCfdi: "{{sample}}|{{more}}|The CFDI use basically tells the SAT what you used the purchase for. The most common are {{sample}}{{#if more}}, plus {{more}} more{{/if}}. For a regular work expense, G03 (general expenses) almost always works. What did you buy? I'll tell you which one fits.",

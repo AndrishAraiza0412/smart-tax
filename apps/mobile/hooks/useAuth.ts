@@ -21,8 +21,14 @@ export function useAuth(): Readonly<{ session: Session | null; loading: boolean 
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
+    }).catch(() => {
+      // Sin red: se queda sin sesión y el guardián manda a login
+      setSession(null);
+      setLoading(false);
     });
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
