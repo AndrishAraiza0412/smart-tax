@@ -13,9 +13,16 @@ const belvoBaseUrl = "https://sandbox.belvo.com";
 
 type BelvoTokenResponse = { readonly access: string };
 
+/** True when sandbox credentials are present (plain or EXPO_PUBLIC-prefixed). */
+export function isBelvoConfigured(): boolean {
+  const id = process.env["BELVO_SECRET_ID"] ?? process.env["EXPO_PUBLIC_BELVO_SECRET_ID"];
+  const password = process.env["BELVO_SECRET_PASSWORD"] ?? process.env["EXPO_PUBLIC_BELVO_SECRET_PASSWORD"];
+  return Boolean(id && password);
+}
+
 export async function createLinkToken(): Promise<string> {
-  const id = process.env["BELVO_SECRET_ID"];
-  const password = process.env["BELVO_SECRET_PASSWORD"];
+  const id = process.env["BELVO_SECRET_ID"] ?? process.env["EXPO_PUBLIC_BELVO_SECRET_ID"];
+  const password = process.env["BELVO_SECRET_PASSWORD"] ?? process.env["EXPO_PUBLIC_BELVO_SECRET_PASSWORD"];
   if (!id || !password) throw new Error("Belvo sandbox credentials are not configured");
 
   const response = await fetch(`${belvoBaseUrl}/api/token/`, {

@@ -16,16 +16,25 @@ type GeminiOpts = { system?: string; history?: Turn[]; temperature?: number; max
 async function callGemini(apiKey: string, model: string, prompt: string, imageBase64?: string, mime = "image/jpeg", opts: GeminiOpts = {}): Promise<string> {
   const parts: unknown[] = [{ text: prompt }];
   if (imageBase64) parts.push({ inline_data: { mime_type: mime, data: imageBase64 } });
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+  const request = () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
       contents: [...(opts.history ?? []), { role: "user", parts }],
-      generationConfig: { temperature: opts.temperature ?? 0.2, maxOutputTokens: opts.maxOutputTokens ?? 800 },
+      generationConfig: { temperature: opts.temperature ?? 0.2, maxOutputTokens: opts.maxOutputTokens ?? 1500 },
     }),
   });
-  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  let res = await request();
+  // Saturación momentánea de Gemini: un reintento corto antes de rendirse.
+  if (res.status === 429 || res.status === 503) {
+    await new Promise((r) => setTimeout(r, 800));
+    res = await request();
+  }
+  if (!res.ok) {
+    console.error(`Gemini ${res.status} (${model}): ${(await res.text()).slice(0, 300)}`);
+    throw new Error(`Gemini ${res.status}`);
+  }
   const body = await res.json();
   const text = body?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
   return text;
@@ -70,7 +79,9 @@ function chatSystemPrompt(context: string, lang: string): string {
 
 Cómo hablas:
 - ${idioma}
-- Primero conecta con lo que la persona pregunta o le preocupa (una frase breve y natural, sin exagerar ni repetir su pregunta), luego explica.
+- Responde exactamente lo que te preguntan en la primera frase; si es una pregunta de sí o no, empieza con "Sí" o "No" y luego explica.
+- No repitas información ni frases que ya diste en esta conversación. Si te preguntan algo parecido, aporta algo nuevo o pregunta qué parte no quedó clara.
+- Varía cómo empiezas y cómo cierras; no termines siempre con una pregunta.
 - Respuestas cortas: 2 a 4 frases. Usa listas solo si te piden pasos o comparaciones.
 - Explica con palabras sencillas y ejemplos de su vida diaria; si usas un término técnico (PUE, CFDI, uso G03), acláralo en pocas palabras.
 - Cuando sea relevante, usa sus datos reales de abajo (montos, gastos concretos). Nunca inventes cifras, artículos de ley ni gastos que no estén ahí.
@@ -102,7 +113,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const action = get("action") || "chat";
 
   const apiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
-  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.0-flash";
+  // Alias que siempre apunta al Flash vigente: los modelos con versión fija se retiran (404).
+  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-flash-latest";
 
   if (action === "detect_facturable") {
     const descripcion = get("descripcion");
@@ -150,7 +162,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     const rawHistory = (body as { history?: unknown }).history;
     const history: Turn[] = (Array.isArray(rawHistory) ? rawHistory : [])
       .filter((m): m is { from: string; text: string } => typeof m?.text === "string" && (m?.from === "user" || m?.from === "bot"))
-      .slice(-6)
+      .slice(-10)
       .map((m) => ({ role: m.from === "user" ? "user" : "model", parts: [{ text: m.text.slice(0, 1000) }] }));
     while (history[0]?.role === "model") history.shift();
     try {
@@ -159,8 +171,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
         system: chatSystemPrompt(context, get("lang")),
         history,
         temperature: 0.7,
-        maxOutputTokens: 500,
+        // Los modelos con "thinking" gastan parte del límite razonando: 500 cortaba o vaciaba la respuesta.
+        maxOutputTokens: 1500,
       })).trim();
+      console.log(`chat model=${model} history=${history.length} empty=${!answer}`);
       if (!answer) return json({ error: "Respuesta vacía", fallback: true }, 502);
       return json({ answer, source: "gemini" });
     } catch (e) {

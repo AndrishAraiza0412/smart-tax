@@ -12,6 +12,10 @@ build/
 .expo/
 .expo-shared/
 
+# Native prebuilds (regenerables con `expo prebuild`)
+apps/mobile/ios/
+apps/mobile/android/
+
 # Supabase
 .supabase/
 supabase/.temp/
@@ -49,3 +53,6 @@ test-results/
 # Agent tooling (puede contener secretos en transcripciones)
 .omo/
 .codegraph
+
+*storybook.log
+storybook-static

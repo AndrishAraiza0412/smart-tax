@@ -1,7 +1,35 @@
 import { Text } from "react-native";
+import { PressableComponent } from "./pressable";
 
-/** Etiqueta pequeña semibold para campos de formulario. */
+export interface LabelProps {
+  children: React.ReactNode;
+  htmlFor?: string;
+  required?: boolean | undefined;
+  className?: string;
+  style?: React.ComponentProps<typeof Text>["style"];
+}
 
-export function Label(props: React.ComponentProps<typeof Text>): React.JSX.Element {
-  return <Text className="font-sans text-sm font-medium text-slate-700 dark:text-slate-300" {...props} />;
+export function Label({
+  children,
+  htmlFor,
+  required,
+  className = "",
+  style,
+  ...props
+}: LabelProps): React.JSX.Element {
+  return (
+    <PressableComponent
+      variant="none"
+      haptic="none"
+      className={`mb-1.5 ${className}`}
+      style={style}
+      onPress={() => htmlFor && undefined}
+      {...props}
+    >
+      <Text className="font-sans text-sm font-medium text-ink dark:text-slate-200">
+        {children}
+        {required && <Text className="text-error ml-0.5" importantForAccessibility="no-hide-descendants">*</Text>}
+      </Text>
+    </PressableComponent>
+  );
 }

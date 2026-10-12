@@ -21,11 +21,11 @@ import { usePlan } from "../../hooks/usePlan";
  */
 const FUNCTIONS_URL = `${process.env["EXPO_PUBLIC_SUPABASE_URL"] ?? ""}/functions/v1/asesor-ia`;
 
-async function askAI(question: string, history: Msg[], lang: string): Promise<string | null> {
+async function askAI(question: string, history: Msg[], lang: string): Promise<{ answer: string } | { error: string }> {
   try {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
-    if (!token) return null;
+    if (!token) return { error: "sin sesión" };
     const res = await fetch(FUNCTIONS_URL, {
       method: "POST",
       headers: {
@@ -33,20 +33,21 @@ async function askAI(question: string, history: Msg[], lang: string): Promise<st
         apikey: process.env["EXPO_PUBLIC_SUPABASE_ANON_KEY"] ?? "",
         authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ action: "chat", question, lang, history: history.slice(-6).map(({ from, text }) => ({ from, text })) }),
+      // Solo turnos reales de la IA: las plantillas locales harían que Gemini las imite.
+      body: JSON.stringify({ action: "chat", question, lang, history: history.filter((m) => m.from === "user" || m.ai).slice(-10).map(({ from, text }) => ({ from, text })) }),
     });
-    if (!res.ok) return null;
-    const body: unknown = await res.json();
-    return typeof body === "object" && body !== null && "answer" in body && typeof body.answer === "string"
-      ? body.answer
-      : null;
-  } catch {
-    return null;
+    const body: unknown = await res.json().catch(() => null);
+    if (res.ok && typeof body === "object" && body !== null && "answer" in body && typeof body.answer === "string") {
+      return { answer: body.answer };
+    }
+    return { error: `HTTP ${res.status}` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "red" };
   }
 }
 
 type Intent = "deduc" | "cfdi" | "regimen" | "timbrar" | "iva" | "pago" | "total" | "hello" | "fallback";
-type Msg = { id: string; from: "bot" | "user"; text: string };
+type Msg = { id: string; from: "bot" | "user"; text: string; ai?: boolean };
 
 function matchIntent(question: string): Intent {
   const q = question.toLowerCase();
@@ -124,7 +125,18 @@ export default function Asesor(): React.JSX.Element {
     setTyping(true);
     void (async () => {
       const ai = can("aiAdvisor") ? await askAI(value, msgs, language) : null;
-      const reply = ai ?? answerFor(value, format(total), gastos.length, t);
+      if (ai && "answer" in ai) {
+        setTyping(false);
+        setMsgs((m) => [...m, { id: `${id}-r`, from: "bot", text: ai.answer, ai: true }]);
+        return;
+      }
+      if (ai && __DEV__) console.warn("asesor-ia falló:", ai.error);
+      let local = answerFor(value, format(total), gastos.length, t);
+      // Plantilla idéntica a la última respuesta: no repetirla palabra por palabra.
+      const lastBot = [...msgs].reverse().find((m) => m.from === "bot");
+      if (lastBot?.text.endsWith(local)) local = t.asesor.repeat;
+      // Con plan de IA, avisar que es la respuesta básica y no la IA.
+      const reply = ai ? `${t.asesor.offline}\n\n${local}` : local;
       setTyping(false);
       setMsgs((m) => [...m, { id: `${id}-r`, from: "bot", text: reply }]);
     })();

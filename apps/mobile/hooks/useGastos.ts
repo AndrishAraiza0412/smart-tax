@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { assertCanAddGasto } from "../lib/plan";
 
-export type Gasto = { id: string; descripcion: string; monto: number; fecha: string; facturable: boolean; categoria?: string | null };
+export type Gasto = { id: string; descripcion: string; monto: number; fecha: string; facturable: boolean; categoria?: string | null; payment_methods?: { last4: string } | null };
 type Filters = { from?: string | undefined; to?: string | undefined; facturable?: boolean | undefined; categoria?: string | undefined };
 
 /**
@@ -19,17 +20,25 @@ export function useGastos(filters: Filters = {}) {
   const load = useCallback(async (nextPage = 0, refresh = false) => {
     if (refresh) setRefreshing(true); else setLoading(true);
     setError(null);
-    let query = supabase.from("gastos").select("id,descripcion,monto,fecha,facturable,categoria").order("fecha", { ascending: false }).range(nextPage * 20, nextPage * 20 + 19);
-    if (filters.from) query = query.gte("fecha", filters.from);
-    if (filters.to) query = query.lte("fecha", filters.to);
-    if (filters.facturable !== undefined) query = query.eq("facturable", filters.facturable);
-    if (filters.categoria) query = query.eq("categoria", filters.categoria);
-    const result = await query;
-    if (result.error) setError(result.error.message); else { const rows = (result.data ?? []) as Gasto[]; setGastos(nextPage ? (current) => [...current, ...rows] : rows); setHasMore(rows.length === 20); setPage(nextPage); }
-    setLoading(false); setRefreshing(false);
+    try {
+      let query = supabase.from("gastos").select("id,descripcion,monto,fecha,facturable,categoria,payment_methods(last4)").order("fecha", { ascending: false }).range(nextPage * 20, nextPage * 20 + 19);
+      if (filters.from) query = query.gte("fecha", filters.from);
+      if (filters.to) query = query.lte("fecha", filters.to);
+      if (filters.facturable !== undefined) query = query.eq("facturable", filters.facturable);
+      if (filters.categoria) query = query.eq("categoria", filters.categoria);
+      const result = await query;
+      if (result.error) setError(result.error.message); else { const rows = (result.data ?? []) as unknown as Gasto[]; setGastos(nextPage ? (current) => [...current, ...rows] : rows); setHasMore(rows.length === 20); setPage(nextPage); }
+    } catch (e) {
+      // Sin red o backend pausado: se muestra error en UI en vez de crashear
+      setError(e instanceof Error ? e.message : "No se pudieron cargar los gastos");
+    } finally {
+      setLoading(false); setRefreshing(false);
+    }
   }, [filters.from, filters.to, filters.facturable, filters.categoria]);
   useEffect(() => { void load(); }, [load]);
-  return { gastos, loading, refreshing, error, hasMore, refresh: () => load(0, true), loadMore: () => hasMore && !loading ? load(page + 1) : undefined };
+  const refresh = useCallback(() => load(0, true), [load]);
+  const loadMore = useCallback(() => { if (hasMore && !loading) void load(page + 1); }, [hasMore, loading, load, page]);
+  return { gastos, loading, refreshing, error, hasMore, refresh, loadMore };
 }
 
 /**
@@ -40,6 +49,7 @@ export async function insertGasto(payload: Record<string, unknown>) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error("Usuario no autenticado - sin sesión");
   if (!session.user) throw new Error("Usuario no autenticado - sin usuario");
+  await assertCanAddGasto();
 
   const supabaseUrl = process.env["EXPO_PUBLIC_SUPABASE_URL"];
   const anonKey = process.env["EXPO_PUBLIC_SUPABASE_ANON_KEY"];
