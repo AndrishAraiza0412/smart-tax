@@ -104,8 +104,6 @@ jobs:
 
   test-e2e:
     name: E2E Tests (Playwright)
-    # TODO: falta playwright.config (baseURL + webServer); no bloquea hasta entonces
-    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -116,6 +114,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter=shared build
       - run: cd apps/mobile && pnpm exec playwright install --with-deps chromium
       - run: cd apps/mobile && pnpm exec playwright test --reporter=github
     env:
