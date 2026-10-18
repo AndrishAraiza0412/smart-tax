@@ -19,6 +19,10 @@ Google Stitch, replicados con NativeWind. Stack 100% gratuito en sandbox.
 
 ## Estructura del monorepo (pnpm workspaces)
 
+> **Nota:** el proyecto Expo vive en `apps/mobile/` (equivale a la carpeta `/app` de la
+> especificación) y la especificación está en `docs/`. Se mantiene el monorepo para no
+> mover código ni romper los workspaces de pnpm.
+
 ```
 smart-tax/
 ├── apps/mobile/               # App Expo Router
@@ -111,6 +115,7 @@ Comandos útiles:
 
 ```bash
 pnpm exec tsc --noEmit   # typecheck (desde apps/mobile)
+# desde la raíz: pnpm lint  (ESLint)
 pnpm expo start --web    # vista web (sin estilos NativeWind completos)
 ```
 

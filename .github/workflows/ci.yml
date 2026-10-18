@@ -57,8 +57,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter=mobile exec eslint . --ext .ts,.tsx || true
-      - run: pnpm --filter=shared exec eslint . --ext .ts || true
+      - run: pnpm lint
 
   test-shared:
     name: Test Shared Package
