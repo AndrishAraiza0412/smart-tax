@@ -9,6 +9,8 @@ export default defineConfig({
     command: "pnpm exec expo start --web --port 8081",
     url: "http://localhost:8081",
     timeout: 180_000,
+    stdout: "pipe",
+    stderr: "pipe",
     reuseExistingServer: !process.env['CI'],
   },
 });
