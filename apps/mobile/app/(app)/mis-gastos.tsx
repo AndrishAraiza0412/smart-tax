@@ -20,6 +20,9 @@ const FILTERS: FilterId[] = ["all", "facturable", "nonbill"];
 const filterLabel = (f: FilterId, t: { all: string; facturable: string; noFacturable: string }): string =>
   f === "all" ? t.all : f === "facturable" ? t.facturable : t.noFacturable;
 
+const validDate = (s: string): string | undefined =>
+  /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().startsWith(s) ? s : undefined;
+
 export default function MisGastos(): React.JSX.Element {
   const [active, setActive] = useState<FilterId>("all");
   const [from, setFrom] = useState("");
@@ -27,8 +30,8 @@ export default function MisGastos(): React.JSX.Element {
   const estadoQuery = active === "all" ? undefined : active === "facturable";
   const { gastos, loading, refreshing, error, refresh, loadMore } = useGastos({
     ...(estadoQuery === undefined ? {} : { facturable: estadoQuery }),
-    from: from || undefined,
-    to: to || undefined,
+    from: validDate(from),
+    to: validDate(to),
   });
   useFocusEffect(useCallback(() => {
     refresh();

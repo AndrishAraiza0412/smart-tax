@@ -35,10 +35,10 @@ const fieldColors = {
   dark: { border: ["#2A3756", "#3B82F6"], bg: ["#111827", "#151E33"] },
 } as const;
 
-const sizeStyles: Record<InputSize, { container: string; input: string; icon: number }> = {
-  sm: { container: "gap-1", input: "h-10 px-3.5 text-body-sm", icon: 16 },
-  md: { container: "gap-1.5", input: "h-12 px-4 text-body-md", icon: 18 },
-  lg: { container: "gap-2", input: "h-14 px-5 text-body-lg", icon: 20 },
+const sizeStyles: Record<InputSize, { container: string; input: string; icon: number; height: number }> = {
+  sm: { container: "gap-1", input: "px-3.5 text-body-sm", icon: 16, height: 40 },
+  md: { container: "gap-1.5", input: "px-4 text-body-md", icon: 18, height: 48 },
+  lg: { container: "gap-2", input: "px-5 text-body-lg", icon: 20, height: 56 },
 };
 
 export function Input({
@@ -97,8 +97,11 @@ export function Input({
         </PressableComponent>
       )}
       <Animated.View
-        className={`flex-row items-center rounded-xl ${editable === false ? "opacity-50" : ""}`}
         style={{
+          flexDirection: "row",
+          alignItems: "center",
+          borderRadius: 12,
+          opacity: editable === false ? 0.5 : 1,
           borderWidth: 1,
           borderColor: isInvalid ? "#F43F5E" : focusAnim.interpolate({ inputRange: [0, 1], outputRange: [...palette.border] }),
           backgroundColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [...palette.bg] }),
@@ -115,15 +118,15 @@ export function Input({
         )}
         <TextInput
           ref={inputRef}
-          className={`
-            flex-1 font-sans text-ink dark:text-white
-            placeholder:text-faint
-            ${sizes.input}
-            ${(leftIcon || leftElement) && "pl-0"}
-            ${(rightIcon || rightElement || (valid && !isInvalid)) && "pr-0"}
-            ${className}
-          `}
+          className={[
+            "flex-1 font-sans text-ink dark:text-white placeholder:text-faint",
+            sizes.input,
+            (leftIcon || leftElement) && "pl-0",
+            (rightIcon || rightElement || (valid && !isInvalid)) && "pr-0",
+            className,
+          ].filter(Boolean).join(" ")}
           editable={editable}
+          style={{ height: sizes.height }}
           value={value}
           defaultValue={defaultValue}
           onChangeText={handleChangeText}
