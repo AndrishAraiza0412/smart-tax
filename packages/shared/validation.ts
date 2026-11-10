@@ -45,7 +45,7 @@ export const GastoSchema = z.object({
   fecha: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Usa el formato AAAA-MM-DD")
-    .refine((s) => new Date(s).toISOString().startsWith(s), "Esa fecha no existe"),
+    .refine((s) => { const d = new Date(s); return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s); }, "Esa fecha no existe"),
   monto: z
     .number({ invalid_type_error: "Escribe un monto válido" })
     .positive("El monto debe ser mayor a 0")
