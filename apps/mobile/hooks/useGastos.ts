@@ -74,3 +74,15 @@ export async function insertGasto(payload: Record<string, unknown>) {
   const data = await res.json();
   return data[0];
 }
+
+/** Actualiza un gasto propio (RLS limita a las filas del usuario). */
+export async function updateGasto(id: string, patch: { descripcion: string; fecha: string; monto: number }): Promise<void> {
+  const { error } = await supabase.from("gastos").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/** Borra un gasto propio. */
+export async function deleteGasto(id: string): Promise<void> {
+  const { error } = await supabase.from("gastos").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}

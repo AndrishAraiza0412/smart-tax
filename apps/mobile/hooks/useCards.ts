@@ -24,6 +24,7 @@ export function useCards(): { cards: Card[]; loading: boolean; add: (input: Card
 
   const add = async (input: CardInput): Promise<Card> => {
     const card = parseTestCard(input);
+    if (cards.some((c) => c.brand === card.brand && c.last4 === card.last4)) throw new Error("Esa tarjeta ya está guardada.");
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Sin sesión");
     const { data, error } = await supabase.from("payment_methods").insert({ ...card, user_id: user.id }).select("id,brand,last4,holder,exp_month,exp_year").single();

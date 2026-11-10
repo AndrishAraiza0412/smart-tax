@@ -5,13 +5,15 @@ import { useFocusEffect } from "expo-router";
 import { Input } from "../../components/ui/input";
 import { useGastos } from "../../hooks/useGastos";
 import { useMoney } from "../../lib/money";
-import { useStrings } from "../../lib/strings";
+import { noun, useStrings } from "../../lib/strings";
 import { Card } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
 import { ScreenHeader } from "../../components/screen-header";
 import { ExpenseEmpty, ExpenseRow } from "../../components/expense-row";
 import { PressableComponent } from "../../components/ui/pressable";
 import { SkeletonList } from "../../components/ui/skeleton-list";
+import { ExpenseEditModal } from "../../components/expense-edit-modal";
+import type { Gasto } from "../../hooks/useGastos";
 
 /** Lista de gastos con filtros por estado CFDI y rango de fechas, con pull-to-refresh y paginación. */
 type FilterId = "all" | "facturable" | "nonbill";
@@ -20,15 +22,19 @@ const FILTERS: FilterId[] = ["all", "facturable", "nonbill"];
 const filterLabel = (f: FilterId, t: { all: string; facturable: string; noFacturable: string }): string =>
   f === "all" ? t.all : f === "facturable" ? t.facturable : t.noFacturable;
 
+const validDate = (s: string): string | undefined =>
+  /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().startsWith(s) ? s : undefined;
+
 export default function MisGastos(): React.JSX.Element {
   const [active, setActive] = useState<FilterId>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [editing, setEditing] = useState<Gasto | null>(null);
   const estadoQuery = active === "all" ? undefined : active === "facturable";
   const { gastos, loading, refreshing, error, refresh, loadMore } = useGastos({
     ...(estadoQuery === undefined ? {} : { facturable: estadoQuery }),
-    from: from || undefined,
-    to: to || undefined,
+    from: validDate(from),
+    to: validDate(to),
   });
   useFocusEffect(useCallback(() => {
     refresh();
@@ -49,7 +55,7 @@ export default function MisGastos(): React.JSX.Element {
             </View>
             <View className="items-end">
               <Text className="font-sans text-sm font-bold tabular-nums text-ink dark:text-white">{gastos.length}</Text>
-              <Text className="font-sans text-xs text-muted dark:text-slate-400">{t.gastos.movements}</Text>
+              <Text className="font-sans text-xs text-muted dark:text-slate-400">{noun(gastos.length, t.gastos.movements)}</Text>
             </View>
           </View>
         </Card>
@@ -102,10 +108,11 @@ export default function MisGastos(): React.JSX.Element {
             </View>
           </View>}
           ListEmptyComponent={loading ? null : <ExpenseEmpty text={t.gastos.empty} />}
-          renderItem={({ item }) => <ExpenseRow gasto={item} />}
+          renderItem={({ item }) => <ExpenseRow gasto={item} onPress={() => setEditing(item)} />}
         />
         {loading && <SkeletonList count={5} />}
         {error && <Text className="px-5 pb-4 text-red-600">{error}</Text>}
+        <ExpenseEditModal gasto={editing} onClose={() => setEditing(null)} onDone={() => void refresh()} />
       </SafeAreaView>
     </View>
   );

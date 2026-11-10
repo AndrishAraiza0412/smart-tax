@@ -17,17 +17,18 @@ export default function AppLayout(): React.JSX.Element {
     <Tabs
       screenOptions={{
         headerShown: false,
+        sceneStyle: { maxWidth: 720, width: "100%", alignSelf: "center" },
         tabBarActiveTintColor: dark ? "#3B82F6" : "#2547E8",
         tabBarInactiveTintColor: "#94A3B8",
         tabBarStyle: {
           backgroundColor: dark ? "#0B0F19" : "#fff",
           borderTopWidth: 1,
           borderTopColor: dark ? "#2A3756" : "#F1F5F9",
-          height: 64,
-          paddingBottom: 10,
-          paddingTop: 6,
+          height: 72,
+          paddingBottom: 14,
+          paddingTop: 8,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarLabelStyle: { fontSize: 11, lineHeight: 14, fontWeight: "600" },
       }}
     >
       <Tabs.Screen
