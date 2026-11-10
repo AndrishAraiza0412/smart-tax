@@ -1,7 +1,7 @@
 import "../global.css";
 import "../lib/alert-web";
 
-import { Stack } from "expo-router";
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { useColorScheme } from "nativewind";
 import { useEffect } from "react";
 import { Platform } from "react-native";
@@ -36,5 +36,12 @@ export default function RootLayout(): React.JSX.Element {
     initPerformance();
   }, []);
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  // El fondo por defecto de react-navigation (#f2f2f2) asomaba a los lados de la columna en escritorio.
+  const base = colorScheme === "dark" ? DarkTheme : DefaultTheme;
+  const theme = { ...base, colors: { ...base.colors, background: colorScheme === "dark" ? "#0B0F19" : "#F8FAFC" } };
+  return (
+    <ThemeProvider value={theme}>
+      <Stack screenOptions={{ headerShown: false }} />
+    </ThemeProvider>
+  );
 }

@@ -175,7 +175,7 @@ export default function Configuraciones(): React.JSX.Element {
         <Card elevation="flat" className="mx-5 mt-4 p-4">
           <View className="flex-row items-center gap-3">
             <View className="h-14 w-14 items-center justify-center rounded-full bg-primary dark:bg-cobalt">
-              <Text className="font-sans text-lg font-bold text-white">{email.slice(0, 2).toUpperCase() || "··"}</Text>
+              <Text className="font-sans text-lg font-bold text-white">{email.slice(0, 2).toUpperCase()}</Text>
             </View>
             <View className="flex-1">
               <Text className="font-sans text-[15px] font-semibold text-ink dark:text-white">{t.cfg.fiscal}</Text>
@@ -184,7 +184,7 @@ export default function Configuraciones(): React.JSX.Element {
           </View>
         </Card>
 
-        {planLoading ? null : plan === "gratis" ? (
+        {planLoading ? <View className="mx-5 mt-4 h-[104px]" /> : plan === "gratis" ? (
           <View className="mx-5 mt-4 overflow-hidden rounded-2xl">
             <HeroGradient style={{ padding: 20 }}>
               <Text className="font-sans text-lg font-bold text-white">{t.cfg.proTitle}</Text>
