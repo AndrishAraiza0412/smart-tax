@@ -47,7 +47,9 @@ const translations = {
       savedFact: "Se creó desde tu comprobante escaneado. Marcado como facturable.",
       savedNoFact: "Se creó desde tu comprobante escaneado. Marcado como no facturable.",
       saveFail: "No se pudo guardar", reanalyze: "Re-analizar", factCheck: "Analizando facturabilidad…",
-      suggests: "IA sugiere:", facturable: "Facturable", noFacturable: "No facturable",
+      suggests: "IA sugiere:", items: "Artículos detectados", removeItem: "Quitar artículo",
+      unsure: "No pude leer bien: {{f}}. Revísalo antes de guardar.",
+      mismatch: "Los artículos suman ${{s}} y el total es ${{t}}. Ajusta antes de guardar.", facturable: "Facturable", noFacturable: "No facturable",
       readFail: "IA no pudo leer", readFailMsg: "Intenta con mejor luz o captura manual.", netFail: "Error de red",
     },
     manual: {
@@ -182,7 +184,9 @@ const translations = {
       savedFact: "Created from your scanned receipt. Marked as billable.",
       savedNoFact: "Created from your scanned receipt. Marked as non-billable.",
       saveFail: "Could not save", reanalyze: "Re-analyze", factCheck: "Checking billability…",
-      suggests: "AI suggests:", facturable: "Billable", noFacturable: "Non-billable",
+      suggests: "AI suggests:", items: "Detected items", removeItem: "Remove item",
+      unsure: "I could not read this clearly: {{f}}. Please check before saving.",
+      mismatch: "Items add up to ${{s}} but the total is ${{t}}. Adjust before saving.", facturable: "Billable", noFacturable: "Non-billable",
       readFail: "AI could not read it", readFailMsg: "Try better light or enter manually.", netFail: "Network error",
     },
     manual: {

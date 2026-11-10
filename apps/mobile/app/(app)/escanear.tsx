@@ -24,7 +24,8 @@ import { parseCfdi, validarEnSat } from "../../lib/cfdi";
 import { usePlan } from "../../hooks/usePlan";
 import { useFiscalProfile } from "../../hooks/useFiscalProfile";
 
-type Extracted = { descripcion: string; monto: string; fecha: string; categoria: string };
+type Item = { nombre: string; precio: string; categoria: string };
+type Extracted = { descripcion: string; monto: string; fecha: string; categoria: string; items: Item[] };
 const CATEGORIAS = ["Alimentación", "Transporte", "Servicios", "Salud", "Oficina", "Educación", "Entretenimiento", "Otros"] as const;
 
 export default function Escanear(): React.JSX.Element {
@@ -36,6 +37,7 @@ export default function Escanear(): React.JSX.Element {
   const [saving, setSaving] = useState(false);
   const [data, setData] = useState<Extracted | null>(null);
   const [facturable, setFacturable] = useState(true);
+  const [dudosos, setDudosos] = useState<string[]>([]);
   const t = useStrings();
   const [aiSuggestion, setAiSuggestion] = useState<{ facturable: boolean; razon: string } | null>(null);
   const [importing, setImporting] = useState(false);
@@ -101,12 +103,13 @@ export default function Escanear(): React.JSX.Element {
         return;
       }
       const result = camera
-        ? await ImagePicker.launchCameraAsync({ quality: 0.5, base64: true, exif: false })
-        : await ImagePicker.launchImageLibraryAsync({ quality: 0.5, base64: true, exif: false });
+        ? await ImagePicker.launchCameraAsync({ quality: 0.8, base64: true, exif: false })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.8, base64: true, exif: false });
       if (!result.canceled && result.assets[0]) {
         setPhoto(result.assets[0].uri);
         setPhotoBase64(result.assets[0].base64 ?? null);
         setData(null);
+        setDudosos([]);
         setAiSuggestion(null);
         setFacturable(true);
       }
@@ -147,7 +150,13 @@ export default function Escanear(): React.JSX.Element {
         monto: String(body.monto ?? "0"),
         fecha: String(body.fecha ?? new Date().toLocaleDateString("en-CA")),
         categoria: CATEGORIAS.includes(body.categoria as (typeof CATEGORIAS)[number]) ? String(body.categoria) : "Otros",
+        items: (Array.isArray(body.items) ? body.items : []).map((i: Record<string, unknown>) => ({
+          nombre: String(i["nombre"] ?? ""),
+          precio: String(i["precio"] ?? "0"),
+          categoria: CATEGORIAS.includes(i["categoria"] as (typeof CATEGORIAS)[number]) ? String(i["categoria"]) : "Otros",
+        })),
       });
+      setDudosos(Array.isArray(body.dudosos) ? body.dudosos.map(String) : []);
       const categoria = CATEGORIAS.includes(body.categoria as (typeof CATEGORIAS)[number]) ? String(body.categoria) : "Otros";
       const sugerencia = ajustarSugerencia({ facturable: Boolean(body.facturable ?? true), razon: String(body.razon ?? "") }, perfil, categoria);
       setFacturable(sugerencia.facturable);
@@ -190,19 +199,27 @@ export default function Escanear(): React.JSX.Element {
     return () => clearTimeout(timer);
   }, [data]);
 
+  const items = data?.items ?? [];
+  const sumaItems = items.reduce((t, i) => t + (Number(i.precio) || 0), 0);
+  const descuadre = !!data && items.length > 0 && Math.abs(sumaItems - Number(data.monto)) > 0.5;
+
   const save = async (): Promise<void> => {
     if (!data) return;
     setSaving(true);
     try {
-      await insertGasto({
-        descripcion: data.descripcion,
-        fecha: data.fecha,
-        monto: Number(data.monto),
-        categoria: data.categoria,
-        facturable,
-        es_automatico: true,
-        cfdi_estado: facturable ? "facturable" : "no_facturable",
-      });
+      // Con artículos: un gasto por categoría (suma de sus artículos); sin ellos, el gasto único de siempre.
+      const grupos = new Map<string, Item[]>();
+      for (const i of items) grupos.set(i.categoria, [...(grupos.get(i.categoria) ?? []), i]);
+      const filas = grupos.size === 0
+        ? [{ descripcion: data.descripcion, monto: Number(data.monto), categoria: data.categoria }]
+        : [...grupos].map(([categoria, g]) => ({
+            descripcion: `${data.descripcion} · ${g.map((i) => i.nombre).join(", ")}`.slice(0, 120),
+            monto: Math.round(g.reduce((t, i) => t + (Number(i.precio) || 0), 0) * 100) / 100,
+            categoria,
+          }));
+      for (const f of filas) {
+        await insertGasto({ ...f, fecha: data.fecha, facturable, es_automatico: true, cfdi_estado: facturable ? "facturable" : "no_facturable" });
+      }
       Alert.alert(t.scan.savedT, facturable ? t.scan.savedFact : t.scan.savedNoFact);
       router.replace("/(app)/mis-gastos");
     } catch (error) {
@@ -241,7 +258,7 @@ export default function Escanear(): React.JSX.Element {
                 <Text className="mt-3 text-center font-sans text-[15px] font-bold text-ink dark:text-white">{t.scan.dropTitle}</Text>
                 <Text className="mt-1 text-center font-sans text-[13px] text-muted dark:text-slate-400">{t.scan.dropSub}</Text>
                 <View className="mt-3 flex-row gap-2">
-                  {["JPG", "PNG", "PDF"].map((fmt) => (
+                  {["JPG", "PNG"].map((fmt) => (
                     <View key={fmt} className="rounded-md border border-border bg-slate-50 px-2 py-1 dark:border-stroke dark:bg-white/5">
                       <Text className="font-sans text-[11px] font-bold text-muted dark:text-slate-300">{fmt}</Text>
                     </View>
@@ -331,13 +348,41 @@ export default function Escanear(): React.JSX.Element {
                           <Input containerClassName="mt-1.5" value={data.fecha} onChangeText={(v) => setData({ ...data, fecha: v })} />
                         </View>
                       </View>
-                      <View className="mt-3">
-                        <Label>{t.scan.category}</Label>
-                        <CategoryGrid
-                          value={data.categoria}
-                          onChange={(v) => setData({ ...data, categoria: v })}
-                        />
-                      </View>
+                      {dudosos.length > 0 && (
+                        <Text className="mt-3 font-sans text-xs text-amber-600 dark:text-amber-400">{fill(t.scan.unsure, { f: dudosos.join(", ") })}</Text>
+                      )}
+                      {items.length > 0 ? (
+                        <View className="mt-3">
+                          <Label>{t.scan.items}</Label>
+                          {items.map((it, idx) => {
+                            const patch = (p: Partial<Item>): void => setData({ ...data, items: items.map((x, j) => (j === idx ? { ...x, ...p } : x)) });
+                            return (
+                              <View key={idx} className="mt-2 rounded-xl border border-border p-2 dark:border-stroke">
+                                <View className="flex-row items-center gap-2">
+                                  <Input containerClassName="flex-1" size="sm" value={it.nombre} onChangeText={(v) => patch({ nombre: v })} />
+                                  <Input containerClassName="w-24" size="sm" keyboardType="decimal-pad" value={it.precio} onChangeText={(v) => patch({ precio: v })} />
+                                  <PressableComponent variant="scale" haptic="light" accessibilityLabel={t.scan.removeItem} onPress={() => setData({ ...data, items: items.filter((_, j) => j !== idx) })}>
+                                    <Icon name="x" size={16} color="#94A3B8" />
+                                  </PressableComponent>
+                                </View>
+                                <PressableComponent variant="scale" haptic="selection" accessibilityLabel={t.scan.category} onPress={() => patch({ categoria: CATEGORIAS[(CATEGORIAS.indexOf(it.categoria as (typeof CATEGORIAS)[number]) + 1) % CATEGORIAS.length] ?? "Otros" })} className="mt-2 self-start rounded-full bg-primary/10 px-3 py-1 dark:bg-cobalt/15">
+                                  <Text className="font-sans text-xs font-semibold text-primary dark:text-cobalt">{it.categoria} ›</Text>
+                                </PressableComponent>
+                              </View>
+                            );
+                          })}
+                          {descuadre && (
+                            <Text className="mt-2 font-sans text-xs text-amber-600 dark:text-amber-400">
+                              {fill(t.scan.mismatch, { s: sumaItems.toFixed(2), t: Number(data.monto).toFixed(2) })}
+                            </Text>
+                          )}
+                        </View>
+                      ) : (
+                        <View className="mt-3">
+                          <Label>{t.scan.category}</Label>
+                          <CategoryGrid value={data.categoria} onChange={(v) => setData({ ...data, categoria: v })} />
+                        </View>
+                      )}
                       {aiSuggestion && (
                         <AiSuggestion
                           prefix={t.scan.suggests}

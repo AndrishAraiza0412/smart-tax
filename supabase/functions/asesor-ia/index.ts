@@ -10,6 +10,8 @@ function fallbackFacturable(descripcion: string, categoria: string): { facturabl
   return { facturable: true, razon: "Parece estrictamente indispensable para la actividad. Confirma CFDI PUE + pago electrónico." };
 }
 
+const CATEGORIAS = ["Alimentación", "Transporte", "Servicios", "Salud", "Oficina", "Educación", "Entretenimiento", "Otros"] as const;
+
 type Turn = { role: "user" | "model"; parts: { text: string }[] };
 type GeminiOpts = { system?: string; history?: Turn[]; temperature?: number; maxOutputTokens?: number };
 
@@ -137,17 +139,42 @@ Deno.serve(async (request: Request): Promise<Response> => {
     if (!imageBase64) return json({ error: "Missing imageBase64" }, 400);
     if (!apiKey) return json({ error: "IA no configurada (GEMINI_API_KEY). Sube foto y captura manual.", fallback: true }, 503);
     try {
-      const prompt = `Lee este ticket/factura mexicano. Responde SOLO JSON sin markdown: {"descripcion": "comercio + concepto corto", "monto": 0.00, "fecha": "YYYY-MM-DD", "categoria": "una de: Alimentación, Transporte, Servicios, Salud, Oficina, Educación, Entretenimiento, Otros", "facturable": boolean, "razon": "por qué es/no es deducible, máx 20 palabras"}. Si no ves un campo, estima con lo visible. Deducible solo si indispensable + CFDI posible + pago electrónico.`;
-      const parsed = extractJson(await callGemini(apiKey, model, prompt, imageBase64, get("mimeType") || "image/jpeg"));
+      const prompt = `Lee este ticket/factura mexicano línea por línea. Responde SOLO JSON sin markdown:
+{"comercio": "nombre del comercio", "total": 0.00, "fecha": "YYYY-MM-DD", "items": [{"nombre": "artículo", "precio": 0.00, "categoria": "una de: ${CATEGORIAS.join(", ")}"}], "dudosos": ["campos que no pudiste leer: total, fecha, items"], "facturable": boolean, "razon": "por qué es/no es deducible, máx 20 palabras"}
+Reglas: un item por artículo comprado, con su precio TOTAL de línea (cantidad x unitario), y clasifica cada artículo por separado (comida→Alimentación, medicina→Salud, papelería→Oficina, etc.). No incluyas subtotal, IVA, propina ni el total como items. NO inventes: si no puedes leer un dato, usa null (o [] en items) y nómbralo en "dudosos". Deducible solo si indispensable + CFDI posible + pago electrónico.`;
+      const parsed = extractJson(await callGemini(apiKey, model, prompt, imageBase64, get("mimeType") || "image/jpeg", { maxOutputTokens: 3000 }));
       if (!parsed) return json({ error: "No se pudo leer el ticket. Intenta con mejor luz." }, 422);
+      const items = (Array.isArray(parsed["items"]) ? parsed["items"] as Record<string, unknown>[] : [])
+        .map((i) => ({
+          nombre: String(i?.["nombre"] ?? "").trim().slice(0, 80),
+          precio: Math.round(Number(i?.["precio"]) * 100) / 100,
+          categoria: (CATEGORIAS as readonly string[]).includes(String(i?.["categoria"])) ? String(i["categoria"]) : "Otros",
+        }))
+        .filter((i) => i.nombre && Number.isFinite(i.precio) && i.precio > 0);
+      const sumaItems = Math.round(items.reduce((t, i) => t + i.precio, 0) * 100) / 100;
+      const totalLeido = Number(parsed["total"]);
+      const total = Number.isFinite(totalLeido) && totalLeido > 0 ? totalLeido : sumaItems;
+      const dudosos = (Array.isArray(parsed["dudosos"]) ? parsed["dudosos"] : []).map(String);
+      if (!(Number.isFinite(totalLeido) && totalLeido > 0) && !dudosos.includes("total")) dudosos.push("total");
+      const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(parsed["fecha"])) ? String(parsed["fecha"]) : null;
+      if (!fecha && !dudosos.includes("fecha")) dudosos.push("fecha");
+      // Lo que la suma no explica (IVA, propina) se registra aparte en vez de perderse.
+      if (items.length && total - sumaItems > 0.5) {
+        items.push({ nombre: "Otros cargos (IVA, propina)", precio: Math.round((total - sumaItems) * 100) / 100, categoria: "Otros" });
+      }
+      const comercio = String(parsed["comercio"] ?? "").trim() || "Compra detectada";
       return json({
-        descripcion: String(parsed["descripcion"] ?? "Compra detectada"),
-        monto: Number(parsed["monto"] ?? 0),
-        fecha: String(parsed["fecha"] ?? new Date().toISOString().slice(0, 10)),
-        categoria: String(parsed["categoria"] ?? "Otros"),
+        descripcion: comercio,
+        comercio,
+        monto: total,
+        fecha: fecha ?? new Date().toISOString().slice(0, 10),
+        categoria: items[0]?.categoria ?? "Otros",
+        items,
+        coincide: items.length === 0 || Math.abs(total - items.reduce((t, i) => t + i.precio, 0)) <= 0.5,
+        dudosos,
         facturable: Boolean(parsed["facturable"] ?? true),
         razon: String(parsed["razon"] ?? ""),
-        confidence: 85,
+        confidence: dudosos.length ? 60 : 85,
         source: "gemini-vision",
       });
     } catch (e) {
