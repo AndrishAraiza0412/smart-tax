@@ -13,7 +13,7 @@ const translations = {
       chooseLang: "Elige idioma", chooseCurr: "Elige moneda", ai: "INTELIGENCIA ARTIFICIAL", biometrics: "Biometría (Face ID)",
       proTitle: "Pasa a Plan Pro IA", proDesc: "Gastos ilimitados y escaneo con inteligencia artificial.", plans: "Ver Planes ›",
       bank: "CONEXIONES BANCARIAS", connect: "Conectar banco", bankPendingT: "Conexión bancaria pendiente",
-      bankPendingM: "Consigue tus credenciales sandbox en dashboard.belvo.com y agrégalas como BELVO_SECRET_ID y BELVO_SECRET_PASSWORD.",
+      bankPendingM: "La conexión bancaria estará disponible próximamente.",
       bankFailT: "No pudimos abrir Belvo", logout: "Cerrar Sesión", version: "SmartTax v1.0.0", cancel: "Cancelar",
     },
     dash: {
@@ -86,7 +86,7 @@ const translations = {
       noSessionM: "Inicia sesión con tu correo una vez para activar Face ID.",
       bioNAT: "Biometría no disponible", bioNAM: "Configura Face ID en tu iPhone para usarlo.",
       faceFail: "Face ID falló", divider: "O CONTINÚA CON", noAccount: "¿No tienes una cuenta? ",
-      register: "Regístrate gratis →", socialFail: "Error en login social", loginFail: "No pudimos iniciar sesión",
+      register: "Regístrate gratis →", socialFail: "Error en login social", loginFail: "No pudimos iniciar sesión", badCreds: "Correo o contraseña incorrectos",
     },
     register: {
       badge: "GASTOS & FACTURACIÓN IA", title: "Crea tu cuenta", desc: "Tus datos fiscales, en un solo lugar.",
@@ -148,7 +148,7 @@ const translations = {
       chooseLang: "Choose language", chooseCurr: "Choose currency", ai: "ARTIFICIAL INTELLIGENCE", biometrics: "Biometrics (Face ID)",
       proTitle: "Go Plan Pro IA", proDesc: "Unlimited expenses and AI scanning.", plans: "View Plans ›",
       bank: "BANK CONNECTIONS", connect: "Connect bank", bankPendingT: "Bank connection pending",
-      bankPendingM: "Get your sandbox credentials at dashboard.belvo.com and add them as BELVO_SECRET_ID and BELVO_SECRET_PASSWORD.",
+      bankPendingM: "Bank connection will be available soon.",
       bankFailT: "Could not open Belvo", logout: "Sign Out", version: "SmartTax v1.0.0", cancel: "Cancel",
     },
     dash: {
@@ -221,7 +221,7 @@ const translations = {
       noSessionM: "Sign in with email once to enable Face ID.",
       bioNAT: "Biometrics unavailable", bioNAM: "Set up Face ID on your iPhone to use it.",
       faceFail: "Face ID failed", divider: "OR CONTINUE WITH", noAccount: "No account yet? ",
-      register: "Sign up free →", socialFail: "Social login error", loginFail: "Could not sign in",
+      register: "Sign up free →", socialFail: "Social login error", loginFail: "Could not sign in", badCreds: "Incorrect email or password",
     },
     register: {
       badge: "EXPENSES & AI BILLING", title: "Create your account", desc: "Your tax data, in one place.",
