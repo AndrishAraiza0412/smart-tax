@@ -166,7 +166,7 @@ export default function Asesor(): React.JSX.Element {
           ref={listRef}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           className="mt-2 flex-1"
-          contentContainerClassName="gap-2.5 px-5 py-3"
+          contentContainerClassName="gap-2.5 px-5 pb-6 pt-3"
           showsVerticalScrollIndicator={false}
           data={typing ? [...msgs, { id: "typing", from: "bot" as const, text: t.asesor.typing }] : msgs}
           keyExtractor={(m) => m.id}
@@ -216,7 +216,7 @@ export default function Asesor(): React.JSX.Element {
                   returnKeyType="send"
                 />
               </View>
-              <PressableComponent variant="both" haptic="light" onPress={() => send()} accessibilityRole="button" accessibilityLabel={t.asesor.placeholder} style={{ width: 50, height: 50, flexShrink: 0 }} className="items-center justify-center rounded-full bg-primary shadow-md dark:bg-cobalt dark:shadow-glow-primary">
+              <PressableComponent variant="both" haptic="light" onPress={() => send()} accessibilityRole="button" accessibilityLabel={language === "en" ? "Send" : "Enviar"} style={{ width: 50, height: 50, flexShrink: 0 }} className="items-center justify-center rounded-full bg-primary shadow-md dark:bg-cobalt dark:shadow-glow-primary">
                 <Icon name="send" size={18} color="#fff" />
               </PressableComponent>
             </View>
