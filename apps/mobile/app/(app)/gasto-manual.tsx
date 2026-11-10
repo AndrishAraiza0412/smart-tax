@@ -49,6 +49,7 @@ export default function GastoManual(): React.JSX.Element {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         const res = await fetch(`${process.env['EXPO_PUBLIC_SUPABASE_URL']}/functions/v1/asesor-ia`, {
+          signal: AbortSignal.timeout(20000),
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -97,13 +98,15 @@ export default function GastoManual(): React.JSX.Element {
             className={name === "monto" ? "tabular-nums" : ""}
             value={name === "monto" ? montoText : String(input.value ?? "")}
             placeholder={placeholder}
-            keyboardType={name === "monto" ? "decimal-pad" : "default"}
+            keyboardType={name === "monto" ? "decimal-pad" : name === "fecha" ? "number-pad" : "default"}
             error={fieldState.error ? (fieldState.error.message ?? "Campo inválido") : undefined}
             onBlur={input.onBlur}
             onChangeText={(value) => {
+              if (name === "fecha") return input.onChange(value.replace(/\D/g, "").slice(0, 8).replace(/^(\d{4})(\d)/, "$1-$2").replace(/^(\d{4}-\d{2})(\d)/, "$1-$2"));
               if (name !== "monto") return input.onChange(value);
-              setMontoText(value);
-              input.onChange(Number(value.replace(",", ".")));
+              const clean = value.replace(",", ".").replace(/[^\d.]/g, "").replace(/^(\d*\.\d*).*$/, "$1");
+              setMontoText(clean);
+              input.onChange(Number(clean));
             }}
           />
         )}

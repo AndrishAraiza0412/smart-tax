@@ -35,7 +35,7 @@ export default function LoginScreen(): React.JSX.Element {
   const submit = async (values: LoginValues): Promise<void> => {
     try {
       const { error } = await supabase.auth.signInWithPassword(values);
-      if (error) Alert.alert(t.login.loginFail, error.message);
+      if (error) Alert.alert(t.login.loginFail, error.message === "Invalid login credentials" ? t.login.badCreds : error.message);
       else {
         await ensureProfile();
         router.replace("/(app)");

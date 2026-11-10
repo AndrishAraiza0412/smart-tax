@@ -19,12 +19,13 @@ function iconFor(categoria: string | null | undefined): { icon: string; tint: st
 }
 
 export function shortDate(fecha: string, months: readonly string[]): string {
-  const [, m, d] = fecha.split("-").map(Number);
-  return `${d ?? ""} ${months[(m ?? 1) - 1]?.slice(0, 3) ?? ""}`;
+  const [y, m, d] = fecha.split("-").map(Number);
+  const year = y && y !== new Date().getFullYear() ? ` ${y}` : "";
+  return `${d ?? ""} ${months[(m ?? 1) - 1]?.slice(0, 3) ?? ""}${year}`;
 }
 
 /** Fila de gasto compartida por dashboard y mis gastos. */
-export function ExpenseRow({ gasto }: { gasto: Omit<Gasto, "facturable"> & { facturable: boolean | null } }): React.JSX.Element {
+export function ExpenseRow({ gasto, onPress }: { gasto: Omit<Gasto, "facturable"> & { facturable: boolean | null }; onPress?: () => void }): React.JSX.Element {
   const { format } = useMoney();
   const t = useStrings();
   const v = iconFor(gasto.categoria);
@@ -34,7 +35,7 @@ export function ExpenseRow({ gasto }: { gasto: Omit<Gasto, "facturable"> & { fac
       ? { label: t.dash.noFacturable, variant: "error" as const }
       : { label: t.dash.unclassified, variant: "neutral" as const };
   return (
-    <Card elevation="flat" className="px-4 py-3.5">
+    <Card elevation="flat" className="px-4 py-3.5" interactive={!!onPress} {...(onPress ? { onPress } : {})}>
       <View className="flex-row items-center gap-3">
         <View className={`h-11 w-11 items-center justify-center rounded-lg ${v.tint}`}>
           <Icon name={v.icon} size={20} color={v.color} />
