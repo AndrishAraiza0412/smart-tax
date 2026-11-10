@@ -41,9 +41,15 @@ export const CATEGORIAS = [
 ] as const;
 
 export const GastoSchema = z.object({
-  descripcion: z.string().min(1),
-  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  monto: z.number().positive(),
+  descripcion: z.string().trim().min(1, "Escribe una descripción"),
+  fecha: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Usa el formato AAAA-MM-DD")
+    .refine((s) => new Date(s).toISOString().startsWith(s), "Esa fecha no existe"),
+  monto: z
+    .number({ invalid_type_error: "Escribe un monto válido" })
+    .positive("El monto debe ser mayor a 0")
+    .max(99999999, "El monto es demasiado grande"),
   categoria: z.enum(CATEGORIAS),
   facturable: z.boolean().default(true),
 });

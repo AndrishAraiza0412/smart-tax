@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FlatList, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "../../components/ui/icon";
@@ -27,6 +27,7 @@ async function askAI(question: string, history: Msg[], lang: string): Promise<{ 
     const token = data.session?.access_token;
     if (!token) return { error: "sin sesión" };
     const res = await fetch(FUNCTIONS_URL, {
+      signal: AbortSignal.timeout(20000),
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -115,6 +116,7 @@ export default function Asesor(): React.JSX.Element {
   const [msgs, setMsgs] = useState<Msg[]>([{ id: "0", from: "bot", text: t.asesor.greeting }]);
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
+  const listRef = useRef<FlatList<Msg>>(null);
 
   const send = (raw?: string): void => {
     const value = (raw ?? text).trim();
@@ -161,6 +163,8 @@ export default function Asesor(): React.JSX.Element {
         </Card>
 
         <FlatList
+          ref={listRef}
+          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           className="mt-2 flex-1"
           contentContainerClassName="gap-2.5 px-5 py-3"
           showsVerticalScrollIndicator={false}
@@ -178,7 +182,7 @@ export default function Asesor(): React.JSX.Element {
               </View>
             ) : (
               <View className="ml-14 max-w-[85%] self-end">
-                <Card elevation="flat" className="bg-primary px-4 py-3 dark:bg-cobalt">
+                <Card elevation="flat" className="px-4 py-3" style={{ backgroundColor: "#2547E8" }}>
                   <Text className="font-sans text-sm leading-5 text-white">{item.text}</Text>
                 </Card>
               </View>

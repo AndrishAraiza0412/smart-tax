@@ -30,9 +30,12 @@ export const hapticFeedback = (
     selection: "selection",
   } as const;
 
-  Haptics.trigger(map[type], options).catch(() => {
+  // En web trigger() puede devolver undefined: Promise.resolve evita el .catch sobre undefined.
+  try {
+    Promise.resolve(Haptics.trigger(map[type], options)).catch(() => {});
+  } catch {
     // Silently ignore haptic errors
-  });
+  }
 };
 
 export const isHapticsAvailable = (): boolean => isNativeAvailable;

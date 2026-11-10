@@ -49,6 +49,7 @@ export default function GastoManual(): React.JSX.Element {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         const res = await fetch(`${process.env['EXPO_PUBLIC_SUPABASE_URL']}/functions/v1/asesor-ia`, {
+          signal: AbortSignal.timeout(20000),
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -102,8 +103,9 @@ export default function GastoManual(): React.JSX.Element {
             onBlur={input.onBlur}
             onChangeText={(value) => {
               if (name !== "monto") return input.onChange(value);
-              setMontoText(value);
-              input.onChange(Number(value.replace(",", ".")));
+              const clean = value.replace(",", ".").replace(/[^\d.]/g, "").replace(/^(\d*\.\d*).*$/, "$1");
+              setMontoText(clean);
+              input.onChange(Number(clean));
             }}
           />
         )}
