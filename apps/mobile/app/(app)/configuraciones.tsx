@@ -76,7 +76,7 @@ export default function Configuraciones(): React.JSX.Element {
   const { currency, language } = usePrefs();
   const t = useStrings();
   const { format } = useMoney();
-  const { plan, can } = usePlan();
+  const { plan, can, loading: planLoading } = usePlan();
   const { cards, add, remove } = useCards();
   const [showCardForm, setShowCardForm] = useState(false);
   const persona = tipoPersona(rfc);
@@ -179,12 +179,12 @@ export default function Configuraciones(): React.JSX.Element {
             </View>
             <View className="flex-1">
               <Text className="font-sans text-[15px] font-semibold text-ink dark:text-white">{t.cfg.fiscal}</Text>
-              <Text className="mt-0.5 font-sans text-xs text-muted dark:text-slate-400">{email || "Cargando…"}</Text>
+              <Text className="mt-0.5 font-sans text-xs text-muted dark:text-slate-400">{email}</Text>
             </View>
           </View>
         </Card>
 
-        {plan === "gratis" ? (
+        {planLoading ? null : plan === "gratis" ? (
           <View className="mx-5 mt-4 overflow-hidden rounded-2xl">
             <HeroGradient style={{ padding: 20 }}>
               <Text className="font-sans text-lg font-bold text-white">{t.cfg.proTitle}</Text>
@@ -295,7 +295,7 @@ export default function Configuraciones(): React.JSX.Element {
               ))}
               {showCardForm ? (
                 <View className="mt-3">
-                  <CardForm onSubmit={async (input) => { await add(input); setShowCardForm(false); }} />
+                  <CardForm onSubmit={async (input) => { await add(input); setShowCardForm(false); Alert.alert("Tarjeta guardada", "Ya puedes usarla en tus pagos de prueba."); }} />
                 </View>
               ) : (
                 <Button variant="outline" leftIcon="plus" fullWidth className="mt-3" onPress={() => setShowCardForm(true)}>
@@ -308,9 +308,10 @@ export default function Configuraciones(): React.JSX.Element {
 
         <Card elevation="flat" className="mx-5 mt-4 p-4">
           <Text className="mb-2 text-[11px] font-bold tracking-widest text-muted dark:text-slate-400">{t.cfg.bank}</Text>
-          <Button accessibilityLabel="Conectar banco" size="lg" fullWidth onPress={() => void connectBank()}>
+          <Button accessibilityLabel="Conectar banco" size="lg" fullWidth disabled={!isBelvoConfigured()} onPress={() => void connectBank()}>
             {t.cfg.connect}
           </Button>
+          {!isBelvoConfigured() && <Text className="mt-2 font-sans text-xs text-muted dark:text-slate-400">{t.cfg.bankPendingM}</Text>}
         </Card>
 
         <PressableComponent variant="both" haptic="medium" onPress={() => void logout()} className="mx-5 mt-4 items-center justify-center rounded-xl border border-error/30 bg-roseTint py-4 dark:border-[rgba(244,63,94,0.3)] dark:bg-[rgba(244,63,94,0.12)]">

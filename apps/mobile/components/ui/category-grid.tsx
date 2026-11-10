@@ -60,7 +60,7 @@ export function CategoryGrid({ value, onChange }: CategoryGridProps): React.JSX.
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              {c.id}
+              {c.id === "Alimentación" ? "Comida" : c.id === "Entretenimiento" ? "Ocio" : c.id}
             </Text>
           </PressableComponent>
         );

@@ -8,7 +8,7 @@ import { Icon } from "../../components/ui/icon";
 import Svg, { Circle, Polyline } from "react-native-svg";
 import { useGastos } from "../../hooks/useGastos";
 import { useMoney } from "../../lib/money";
-import { useStrings } from "../../lib/strings";
+import { noun, useStrings } from "../../lib/strings";
 import type { Gasto } from "../../hooks/useGastos";
 import { useFocusEffect } from "expo-router";
 import { useCallback } from "react";
@@ -95,7 +95,7 @@ export default function Dashboard(): React.JSX.Element {
               </Text>
             </View>
             <Link href="/(app)/configuraciones" asChild>
-              <PressableComponent variant="scale" haptic="light" accessibilityRole="button" className="h-10 w-10 items-center justify-center rounded-full bg-white/20">
+              <PressableComponent variant="scale" haptic="light" accessibilityRole="button" accessibilityLabel={t.cfg.title} className="h-10 w-10 items-center justify-center rounded-full bg-white/20">
                 <Icon name="settings" size={18} color="#fff" />
               </PressableComponent>
             </Link>
@@ -118,7 +118,7 @@ export default function Dashboard(): React.JSX.Element {
               <Text className="mt-1 font-sans text-lg font-bold tabular-nums text-white">{loading ? "…" : fmt(facturableTotal)}</Text>
               <View className="mt-1 flex-row items-center">
                 <Icon name="check" size={12} color="#6EE7B7" />
-                <Text className="ml-1 font-sans text-[11px] font-semibold text-emerald-300">{factCount} {t.dash.vouchers}</Text>
+                <Text className="ml-1 font-sans text-[11px] font-semibold text-emerald-300">{factCount} {noun(factCount, t.dash.vouchers)}</Text>
               </View>
             </View>
             <View className="flex-1 rounded-2xl border border-white/10 bg-[#0A0F24] p-3">
@@ -162,7 +162,7 @@ export default function Dashboard(): React.JSX.Element {
           </Link>
 
           <View className="mx-5 mt-6 flex-row items-center justify-between">
-            <Text className="font-sans text-label-caps uppercase tracking-[0.06em] text-muted dark:text-slate-400">{t.dash.monthly} {now.getFullYear()}</Text>
+            <Text className="font-sans text-label-caps uppercase tracking-[0.06em] text-muted dark:text-slate-400">{t.dash.monthly}</Text>
             <Link href="/(app)/mis-gastos">
               <Text className="font-sans text-xs font-semibold text-primary dark:text-cobalt">{t.dash.viewExpenses}</Text>
             </Link>

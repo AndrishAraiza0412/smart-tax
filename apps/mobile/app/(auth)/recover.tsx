@@ -9,7 +9,6 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Card } from "../../components/ui/card";
 import { AuthHeader } from "../../components/auth-header";
-import { Badge } from "../../components/ui/badge";
 import { supabase } from "../../lib/supabase";
 import { useStrings } from "../../lib/strings";
 
@@ -58,9 +57,6 @@ export default function RecoverScreen(): React.JSX.Element {
             />
           )}
         />
-        <View className="mt-1.5 flex-row items-center">
-          <Badge variant="success" size="sm">{t.recover.connected}</Badge>
-        </View>
 
         <Button size="lg" fullWidth className="mt-6" disabled={!isValid || isSubmitting} isLoading={isSubmitting} onPress={() => void handleSubmit(submit)()}>
           {isSubmitting ? t.recover.sending : t.recover.submit}
@@ -78,14 +74,6 @@ export default function RecoverScreen(): React.JSX.Element {
           </View>
         </View>
       </Card>
-
-      <View className="mx-5 mt-4 flex-row items-center justify-center gap-4">
-        <View className="flex-row items-center">
-          <Icon name="lock" size={12} color="#94A3B8" />
-          <Text className="ml-1 font-sans text-[11px] text-faint">Cifrado bancario AES-256</Text>
-        </View>
-        <Text className="font-sans text-[11px] text-faint">SAT · CFDI 4.0</Text>
-      </View>
 
       <View className="mt-5 flex-row justify-center">
         <Text className="font-sans text-sm text-muted dark:text-slate-400">{t.recover.remember}</Text>
