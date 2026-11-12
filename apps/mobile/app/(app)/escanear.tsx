@@ -40,7 +40,6 @@ export default function Escanear(): React.JSX.Element {
   const [dudosos, setDudosos] = useState<string[]>([]);
   const t = useStrings();
   const [aiSuggestion, setAiSuggestion] = useState<{ facturable: boolean; razon: string } | null>(null);
-  const [importing, setImporting] = useState(false);
   const { can } = usePlan();
   const perfil = useFiscalProfile();
 
@@ -51,12 +50,8 @@ export default function Escanear(): React.JSX.Element {
     ]);
   };
 
-  const importXml = async (): Promise<void> => {
+  const importXml = async (asset: DocumentPicker.DocumentPickerAsset): Promise<void> => {
     if (!can("cfdiImport")) return upsell(t.pro.upsellXml);
-    const picked = await DocumentPicker.getDocumentAsync({ type: ["text/xml", "application/xml", "*/*"], copyToCacheDirectory: true });
-    const asset = picked.canceled ? null : picked.assets[0];
-    if (!asset) return;
-    setImporting(true);
     try {
       const xml = await (await fetch(asset.uri)).text();
       const cfdi = parseCfdi(xml);
@@ -87,9 +82,39 @@ export default function Escanear(): React.JSX.Element {
       router.replace("/(app)/mis-gastos");
     } catch (e) {
       Alert.alert(t.pro.xmlFail, e instanceof Error ? e.message : "Intenta de nuevo");
-    } finally {
-      setImporting(false);
     }
+  };
+
+  // Archivos: una imagen entra al flujo normal de escaneo; un XML se importa como CFDI.
+  const pickFile = async (): Promise<void> => {
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({ type: ["image/*", "text/xml", "application/xml"], copyToCacheDirectory: true });
+      const asset = picked.canceled ? null : picked.assets[0];
+      if (!asset) return;
+      if (asset.mimeType?.includes("xml") || asset.name.toLowerCase().endsWith(".xml")) return await importXml(asset);
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        void fetch(asset.uri).then((r) => r.blob()).then((b) => reader.readAsDataURL(b), reject);
+      });
+      setPhoto(asset.uri);
+      setPhotoBase64(dataUrl.split(",")[1] ?? null);
+      setData(null);
+      setDudosos([]);
+      setAiSuggestion(null);
+      setFacturable(true);
+    } catch (error) {
+      Alert.alert(t.scan.netFail, error instanceof Error ? error.message : "Intenta de nuevo");
+    }
+  };
+
+  const upload = (): void => {
+    Alert.alert(t.scan.uploadFrom, undefined, [
+      { text: t.scan.fromGallery, onPress: () => void pick(false) },
+      { text: t.scan.fromFiles, onPress: () => void pickFile() },
+      { text: t.scan.cancel, style: "cancel" },
+    ]);
   };
 
   const pick = async (camera: boolean): Promise<void> => {
@@ -275,14 +300,11 @@ export default function Escanear(): React.JSX.Element {
                 <Icon name="camera" size={16} color="#fff" />
                 <Text className="ml-2 font-sans text-sm font-semibold text-white">{t.scan.photo}</Text>
               </PressableComponent>
-              <PressableComponent variant="both" haptic="light" onPress={() => void pick(false)} className="flex-1 flex-row items-center justify-center rounded-xl border border-border bg-surface py-3.5 dark:border-stroke dark:bg-nightcard">
+              <PressableComponent variant="both" haptic="light" onPress={upload} className="flex-1 flex-row items-center justify-center rounded-xl border border-border bg-surface py-3.5 dark:border-stroke dark:bg-nightcard">
                 <Icon name="upload" size={16} color="#2547E8" />
                 <Text className="ml-2 font-sans text-sm font-semibold text-ink dark:text-white">{t.scan.gallery}</Text>
               </PressableComponent>
             </View>
-            <Button variant="outline" size="lg" leftIcon="file-text" className="mx-5 mt-3" isLoading={importing} disabled={importing} onPress={() => void importXml()}>
-              {t.pro.importXml}
-            </Button>
 
             <View className="mx-5 mt-6 flex-row items-center justify-between">
               <Text className="font-sans text-label-caps uppercase tracking-[0.06em] text-muted dark:text-slate-400">{t.scan.docTitle}</Text>
@@ -291,36 +313,36 @@ export default function Escanear(): React.JSX.Element {
               </Link>
             </View>
             <View className="mx-5 mt-2 flex-row gap-3">
-              <PressableComponent variant="scale" haptic="selection" onPress={() => void pick(false)} className="flex-1 items-center rounded-2xl border border-border bg-surface p-5 dark:border-stroke dark:bg-nightcard">
+              <View className="flex-1 items-center rounded-2xl border border-border bg-surface p-5 dark:border-stroke dark:bg-nightcard">
                 <View className="h-12 w-12 items-center justify-center rounded-2xl bg-skyTint">
                   <Icon name="receipt" size={22} color="#2547E8" />
                 </View>
                 <Text className="mt-2 text-center font-sans text-[15px] font-semibold text-ink dark:text-white">{t.scan.docReceipts}</Text>
                 <Text className="mt-0.5 text-center font-sans text-xs text-muted dark:text-slate-300">{t.scan.docReceiptsDesc}</Text>
-              </PressableComponent>
-              <PressableComponent variant="scale" haptic="selection" onPress={() => void pick(false)} className="flex-1 items-center rounded-2xl border border-border bg-surface p-5 dark:border-stroke dark:bg-nightcard">
+              </View>
+              <View className="flex-1 items-center rounded-2xl border border-border bg-surface p-5 dark:border-stroke dark:bg-nightcard">
                 <View className="h-12 w-12 items-center justify-center rounded-2xl bg-emeraldTint">
                   <Icon name="file-text" size={22} color="#059669" />
                 </View>
                 <Text className="mt-2 text-center font-sans text-[15px] font-semibold text-ink dark:text-white">{t.scan.docInvoice}</Text>
                 <Text className="mt-0.5 text-center font-sans text-xs text-muted dark:text-slate-300">{t.scan.docInvoiceDesc}</Text>
-              </PressableComponent>
+              </View>
             </View>
             <View className="mx-5 mt-3 flex-row gap-3">
-              <PressableComponent variant="scale" haptic="selection" onPress={() => void pick(false)} className="flex-1 items-center rounded-2xl border border-border bg-surface p-5 dark:border-stroke dark:bg-nightcard">
+              <View className="flex-1 items-center rounded-2xl border border-border bg-surface p-5 dark:border-stroke dark:bg-nightcard">
                 <View className="h-12 w-12 items-center justify-center rounded-2xl bg-roseTint">
                   <Icon name="heart" size={22} color="#E11D48" />
                 </View>
                 <Text className="mt-2 text-center font-sans text-[15px] font-semibold text-ink dark:text-white">{t.scan.docMedical}</Text>
                 <Text className="mt-0.5 text-center font-sans text-xs text-muted dark:text-slate-300">{t.scan.docMedicalDesc}</Text>
-              </PressableComponent>
-              <PressableComponent variant="scale" haptic="selection" onPress={() => void pick(false)} className="flex-1 items-center rounded-2xl border border-border bg-surface p-5 dark:border-stroke dark:bg-nightcard">
+              </View>
+              <View className="flex-1 items-center rounded-2xl border border-border bg-surface p-5 dark:border-stroke dark:bg-nightcard">
                 <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#FEF3C7]">
                   <Icon name="send" size={22} color="#D97706" />
                 </View>
                 <Text className="mt-2 text-center font-sans text-[15px] font-semibold text-ink dark:text-white">{t.scan.docTravel}</Text>
                 <Text className="mt-0.5 text-center font-sans text-xs text-muted dark:text-slate-300">{t.scan.docTravelDesc}</Text>
-              </PressableComponent>
+              </View>
             </View>
           </>
         ) : (

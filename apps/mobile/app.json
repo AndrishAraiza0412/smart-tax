@@ -3,7 +3,7 @@
     "name": "SmartTax",
     "slug": "smarttax",
     "version": "1.0.0",
-    "sdkVersion": "57.0.0",
+    "sdkVersion": "58.0.0",
     "orientation": "portrait",
     "scheme": "smarttax",
     "userInterfaceStyle": "automatic",
@@ -36,7 +36,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.REEMPLAZAR-CON-TU-IOS-CLIENT-ID"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }
