@@ -6,6 +6,7 @@ import { AiSuggestion } from "../../components/ai-suggestion";
 import { Icon } from "../../components/ui/icon";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { usosCFDI } from "@smarttax/shared";
 import { Link, useRouter } from "expo-router";
 
@@ -27,6 +28,14 @@ import { useFiscalProfile } from "../../hooks/useFiscalProfile";
 type Item = { nombre: string; precio: string; categoria: string };
 type Extracted = { descripcion: string; monto: string; fecha: string; categoria: string; items: Item[] };
 const CATEGORIAS = ["Alimentación", "Transporte", "Servicios", "Salud", "Oficina", "Educación", "Entretenimiento", "Otros"] as const;
+
+// Un ticket se lee bien a ~1280 px; la foto completa solo hace lenta la subida y la lectura de la IA.
+const shrink = async (uri: string): Promise<{ uri: string; base64: string | null }> => {
+  const ctx = ImageManipulator.manipulate(uri);
+  ctx.resize({ width: 1280 });
+  const img = await (await ctx.renderAsync()).saveAsync({ format: SaveFormat.JPEG, compress: 0.6, base64: true });
+  return { uri: img.uri, base64: img.base64 ?? null };
+};
 
 export default function Escanear(): React.JSX.Element {
   const router = useRouter();
@@ -92,14 +101,9 @@ export default function Escanear(): React.JSX.Element {
       const asset = picked.canceled ? null : picked.assets[0];
       if (!asset) return;
       if (asset.mimeType?.includes("xml") || asset.name.toLowerCase().endsWith(".xml")) return await importXml(asset);
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        void fetch(asset.uri).then((r) => r.blob()).then((b) => reader.readAsDataURL(b), reject);
-      });
-      setPhoto(asset.uri);
-      setPhotoBase64(dataUrl.split(",")[1] ?? null);
+      const img = await shrink(asset.uri);
+      setPhoto(img.uri);
+      setPhotoBase64(img.base64);
       setData(null);
       setDudosos([]);
       setAiSuggestion(null);
@@ -128,11 +132,12 @@ export default function Escanear(): React.JSX.Element {
         return;
       }
       const result = camera
-        ? await ImagePicker.launchCameraAsync({ quality: 0.8, base64: true, exif: false })
-        : await ImagePicker.launchImageLibraryAsync({ quality: 0.8, base64: true, exif: false });
+        ? await ImagePicker.launchCameraAsync({ quality: 1, exif: false })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 1, exif: false });
       if (!result.canceled && result.assets[0]) {
-        setPhoto(result.assets[0].uri);
-        setPhotoBase64(result.assets[0].base64 ?? null);
+        const img = await shrink(result.assets[0].uri);
+        setPhoto(img.uri);
+        setPhotoBase64(img.base64);
         setData(null);
         setDudosos([]);
         setAiSuggestion(null);
@@ -164,6 +169,7 @@ export default function Escanear(): React.JSX.Element {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ action: "analyze_ticket", imageBase64: photoBase64, mimeType: "image/jpeg" }),
+        signal: AbortSignal.timeout(65000),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -187,7 +193,8 @@ export default function Escanear(): React.JSX.Element {
       setFacturable(sugerencia.facturable);
       setAiSuggestion(sugerencia);
     } catch (e) {
-      Alert.alert(t.scan.netFail, e instanceof Error ? e.message : "Intenta de nuevo");
+      const timedOut = e instanceof Error && e.name === "TimeoutError";
+      Alert.alert(t.scan.netFail, timedOut ? "Tardó demasiado en responder. Intenta de nuevo con una foto bien iluminada." : e instanceof Error ? e.message : "Intenta de nuevo");
     } finally {
       setAnalyzing(false);
     }

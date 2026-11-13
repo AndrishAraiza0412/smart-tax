@@ -18,24 +18,37 @@ type GeminiOpts = { system?: string; history?: Turn[]; temperature?: number; max
 async function callGemini(apiKey: string, model: string, prompt: string, imageBase64?: string, mime = "image/jpeg", opts: GeminiOpts = {}): Promise<string> {
   const parts: unknown[] = [{ text: prompt }];
   if (imageBase64) parts.push({ inline_data: { mime_type: mime, data: imageBase64 } });
-  const request = () => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+  const request = (m: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
       contents: [...(opts.history ?? []), { role: "user", parts }],
-      generationConfig: { temperature: opts.temperature ?? 0.2, maxOutputTokens: opts.maxOutputTokens ?? 1500 },
+      generationConfig: {
+        temperature: opts.temperature ?? 0.2,
+        maxOutputTokens: opts.maxOutputTokens ?? 1500,
+        // Opcional: GEMINI_THINKING_LEVEL (modelos 3.x: minimal|low) para que no "piense" de más al leer un ticket.
+        ...(Deno.env.get("GEMINI_THINKING_LEVEL") ? { thinkingConfig: { thinkingLevel: Deno.env.get("GEMINI_THINKING_LEVEL") } } : {}),
+      },
     }),
+    signal: AbortSignal.timeout(20000),
   });
-  let res = await request();
-  // Saturación momentánea de Gemini: un reintento corto antes de rendirse.
-  if (res.status === 429 || res.status === 503) {
+  const saturado = (r: Response) => r.status === 429 || r.status >= 500;
+  let usado = model;
+  let res = await request(usado);
+  // Saturación momentánea de Gemini: un reintento corto y, si sigue, un modelo de respaldo.
+  if (saturado(res)) {
     await new Promise((r) => setTimeout(r, 800));
-    res = await request();
+    res = await request(usado);
+  }
+  if (saturado(res)) {
+    usado = Deno.env.get("GEMINI_FALLBACK_MODEL") ?? "gemini-3.5-flash-lite";
+    if (usado !== model) res = await request(usado);
   }
   if (!res.ok) {
-    console.error(`Gemini ${res.status} (${model}): ${(await res.text()).slice(0, 300)}`);
-    throw new Error(`Gemini ${res.status}`);
+    const detalle = (await res.text()).slice(0, 300);
+    console.error(`Gemini ${res.status} (${usado}): ${detalle}`);
+    throw new Error(`Gemini ${res.status} (${usado}): ${detalle}`);
   }
   const body = await res.json();
   const text = body?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
@@ -116,7 +129,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   const apiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
   // Alias que siempre apunta al Flash vigente: los modelos con versión fija se retiran (404).
-  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-flash-latest";
+  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash";
 
   if (action === "detect_facturable") {
     const descripcion = get("descripcion");
@@ -178,7 +191,8 @@ Reglas: un item por artículo comprado, con su precio TOTAL de línea (cantidad 
         source: "gemini-vision",
       });
     } catch (e) {
-      return json({ error: e instanceof Error ? e.message : "Error IA", fallback: true }, 502);
+      const msg = e instanceof Error ? e.message : "Error IA";
+      return json({ error: /Gemini (429|5\d\d)|TimeoutError|timed out/i.test(msg) ? "La IA está saturada en este momento. Intenta de nuevo en unos segundos." : msg, fallback: true }, 502);
     }
   }
 
