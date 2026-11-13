@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Alert, Image, Linking, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { HeroGradient } from "../../components/hero-gradient";
@@ -42,6 +42,7 @@ export default function Escanear(): React.JSX.Element {
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const [detectingFacturable, setDetectingFacturable] = useState(false);
   const [saving, setSaving] = useState(false);
   const [data, setData] = useState<Extracted | null>(null);
@@ -155,6 +156,16 @@ export default function Escanear(): React.JSX.Element {
       return;
     }
     setAnalyzing(true);
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, 65000);
+    // Si la IA falla, el formulario queda abierto para capturar a mano: nunca bloquea el panel.
+    const manual = (): void => {
+      setData({ descripcion: "", monto: "", fecha: new Date().toLocaleDateString("en-CA"), categoria: "Otros", items: [] });
+      setDudosos([]);
+      setAiSuggestion(null);
+    };
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -169,11 +180,12 @@ export default function Escanear(): React.JSX.Element {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ action: "analyze_ticket", imageBase64: photoBase64, mimeType: "image/jpeg" }),
-        signal: AbortSignal.timeout(65000),
+        signal: ctrl.signal,
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        Alert.alert(t.scan.readFail, typeof body.error === "string" ? body.error : t.scan.readFailMsg);
+        manual();
+        Alert.alert(t.scan.readFail, `${typeof body.error === "string" ? body.error : t.scan.readFailMsg}\n\n${t.scan.manualMsg}`);
         return;
       }
       setData({
@@ -193,9 +205,12 @@ export default function Escanear(): React.JSX.Element {
       setFacturable(sugerencia.facturable);
       setAiSuggestion(sugerencia);
     } catch (e) {
-      const timedOut = e instanceof Error && e.name === "TimeoutError";
-      Alert.alert(t.scan.netFail, timedOut ? "Tardó demasiado en responder. Intenta de nuevo con una foto bien iluminada." : e instanceof Error ? e.message : "Intenta de nuevo");
+      if (ctrl.signal.aborted && !timedOut) return; // cancelado por la persona
+      manual();
+      Alert.alert(t.scan.netFail, `${timedOut ? "Tardó demasiado en responder." : e instanceof Error ? e.message : "Intenta de nuevo"}\n\n${t.scan.manualMsg}`);
     } finally {
+      clearTimeout(timer);
+      abortRef.current = null;
       setAnalyzing(false);
     }
   };
@@ -360,9 +375,23 @@ export default function Escanear(): React.JSX.Element {
                 <Image source={{ uri: photo }} className="h-56 w-full" resizeMode="cover" />
                 <View className="p-4">
                   {!data ? (
-                    <Button disabled={analyzing} isLoading={analyzing} onPress={() => void analyze()}>
-                      {analyzing ? t.scan.analyzing : t.scan.analyze}
-                    </Button>
+                    <View>
+                      <Button disabled={analyzing} isLoading={analyzing} onPress={() => void analyze()}>
+                        {analyzing ? t.scan.analyzing : t.scan.analyze}
+                      </Button>
+                      <PressableComponent
+                        variant="none"
+                        haptic="none"
+                        onPress={() => {
+                          abortRef.current?.abort();
+                          setPhoto(null);
+                          setPhotoBase64(null);
+                        }}
+                        className="mt-3 items-center"
+                      >
+                        <Text className="font-sans text-sm font-semibold text-primary dark:text-cobalt">{analyzing ? t.scan.cancel : t.scan.changePhoto}</Text>
+                      </PressableComponent>
+                    </View>
                   ) : (
                     <View>
                       <Label>{t.scan.commerce}</Label>

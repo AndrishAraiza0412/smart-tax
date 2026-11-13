@@ -192,7 +192,7 @@ Reglas: un item por artículo comprado, con su precio TOTAL de línea (cantidad 
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error IA";
-      return json({ error: /Gemini (429|5\d\d)|TimeoutError|timed out/i.test(msg) ? "La IA está saturada en este momento. Intenta de nuevo en unos segundos." : msg, fallback: true }, 502);
+      return json({ error: /Gemini (429|5\d\d)|TimeoutError|timed out/i.test(msg) ? `La IA está saturada en este momento. Intenta de nuevo en unos segundos. (${msg.slice(0, 160)})` : msg, fallback: true }, 502);
     }
   }
 
