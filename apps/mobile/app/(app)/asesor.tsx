@@ -41,7 +41,8 @@ async function askAI(question: string, history: Msg[], lang: string): Promise<{ 
     if (res.ok && typeof body === "object" && body !== null && "answer" in body && typeof body.answer === "string") {
       return { answer: body.answer };
     }
-    return { error: `HTTP ${res.status}` };
+    const detalle = typeof body === "object" && body !== null && "error" in body ? ` · ${String(body.error)}` : "";
+    return { error: `HTTP ${res.status}${detalle}` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "red" };
   }
